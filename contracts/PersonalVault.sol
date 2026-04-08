@@ -72,7 +72,12 @@ contract PersonalVault is ReentrancyGuard {
             symbol = "qTKN";
         }
 
-        ShieldToken qToken = new ShieldToken(name, symbol, address(this));
+        uint8 underlyingDecimals = 18;
+        try ITokenMetadata(tokenAddress).decimals() returns (uint8 d) {
+            underlyingDecimals = d;
+        } catch {}
+
+        ShieldToken qToken = new ShieldToken(name, symbol, address(this), underlyingDecimals);
         qTokens[tokenAddress] = address(qToken);
 
         emit QTokenDeployed(tokenAddress, address(qToken));
@@ -223,4 +228,5 @@ contract PersonalVault is ReentrancyGuard {
 interface ITokenMetadata {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
+    function decimals() external view returns (uint8);
 }
