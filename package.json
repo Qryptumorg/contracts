@@ -1,0 +1,28 @@
+{
+  "name": "qryptum-contracts",
+  "version": "1.0.0",
+  "description": "Qryptum smart contracts — ShieldFactory, PersonalVault, ShieldToken",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
+    "node": "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
+    "@nomicfoundation/hardhat-ethers": "^3.1.3",
+    "@nomicfoundation/hardhat-network-helpers": "^1.1.2",
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.1.3",
+    "chai": "^4.5.0",
+    "ethers": "^6.16.0",
+    "hardhat": "^2.22.0",
+    "hardhat-gas-reporter": "^1.0.10",
+    "solidity-coverage": "^0.8.17"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}
