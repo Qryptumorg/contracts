@@ -1,7 +1,7 @@
 {
   "name": "qryptum-contracts",
   "version": "1.0.0",
-  "description": "Qryptum smart contracts — ShieldFactory, PersonalVault, ShieldToken",
+  "description": "Qryptum smart contracts: ShieldFactory, PersonalVault, ShieldToken",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
