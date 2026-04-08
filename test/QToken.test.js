@@ -11,7 +11,7 @@ describe("ShieldToken (qToken)", function () {
     [vault, user, other] = await ethers.getSigners();
 
     const ShieldToken = await ethers.getContractFactory("ShieldToken");
-    qToken = await ShieldToken.connect(vault).deploy("qUSDT", "qUSDT", vault.address);
+    qToken = await ShieldToken.connect(vault).deploy("qUSDT", "qUSDT", vault.address, 6);
     await qToken.waitForDeployment();
   });
 
@@ -27,6 +27,10 @@ describe("ShieldToken (qToken)", function () {
 
     it("starts with zero total supply", async function () {
       expect(await qToken.totalSupply()).to.equal(0n);
+    });
+
+    it("returns correct decimals from underlying token", async function () {
+      expect(await qToken.decimals()).to.equal(6);
     });
   });
 
