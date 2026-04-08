@@ -75,3 +75,25 @@ npm test
 [![License: MIT](https://img.shields.io/badge/License-MIT-white.svg)](LICENSE)
 
 Copyright (c) 2026 [wei-zuan](https://github.com/wei-zuan). See [LICENSE](LICENSE) for full terms.
+
+
+## Deployed Addresses (Sepolia Testnet)
+
+### v2 -- Active (qToken decimal precision fix)
+
+> **Why redeployed:** ShieldToken v1 defaulted to 18 decimals regardless of the underlying token.
+> USDC has 6 decimals, so 9.5 qUSDC displayed as 0.0000000000095 in Etherscan and wallets.
+> v2 fixes this: `ShieldToken` reads `decimals()` from the underlying ERC-20 at qToken deploy time
+> and stores it permanently. All qTokens now display the correct amount for any token.
+
+| Contract | Address | Etherscan |
+|---|---|---|
+| ShieldFactory v2 | `0x0c060e880A405B1231Ce1263c6a52a272cC1cE05` | [View source](https://sepolia.etherscan.io/address/0x0c060e880A405B1231Ce1263c6a52a272cC1cE05#code) |
+| PersonalVault impl v2 | `0x5A77630B5D49943f71785BC57aF37380bBea0c5e` | Deployed |
+
+### v1 -- Superseded (decimal precision bug)
+
+| Contract | Address | Etherscan |
+|---|---|---|
+| ShieldFactory v1 | `0x9a66500886344cbcce882137f263CB0c61aa99b1` | [View source](https://sepolia.etherscan.io/address/0x9a66500886344cbcce882137f263CB0c61aa99b1#code) |
+| PersonalVault impl v1 | `0x63f575b38e9C6a26eAeb57d2382bC42B456fafbf` | [View source](https://sepolia.etherscan.io/address/0x63f575b38e9C6a26eAeb57d2382bC42B456fafbf#code) |
