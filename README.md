@@ -1,5 +1,7 @@
 # Qryptum Contracts
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-white.svg)](LICENSE)
+
 Smart contracts powering the Qryptum protocol on Ethereum.
 
 ## Contracts
@@ -42,7 +44,6 @@ Non-transferable ERC-20 representing shielded balance.
 
 ```bash
 cp .env.example .env
-# fill in your values
 npm install
 npm run compile
 npm test
@@ -71,4 +72,6 @@ npm test
 
 ## License
 
-MIT
+[![License: MIT](https://img.shields.io/badge/License-MIT-white.svg)](LICENSE)
+
+Copyright (c) 2026 [wei-zuan](https://github.com/wei-zuan) — see [LICENSE](LICENSE) for full terms.
