@@ -4,8 +4,8 @@ Solidity contracts for the Qryptum protocol. Non-custodial ERC-20 shielding on E
 
 ## Contracts
 
-- **ShieldFactory** - Deploys personal QRYPTANKs using minimal proxy clones
-- **PersonalVault** - The QRYPTANK: shields ERC-20 tokens behind a vault proof
+- **ShieldFactory** - Deploys personal Qrypt-Safes using minimal proxy clones
+- **PersonalVault** - The Qrypt-Safe: shields ERC-20 tokens behind a vault proof
 - **ShieldToken** - Non-transferable qToken representing shielded balance
 - **MockERC20** - Test token for local development
 
