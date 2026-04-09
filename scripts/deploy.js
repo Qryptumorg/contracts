@@ -9,15 +9,15 @@ async function main() {
     console.log("Network:", network.name, "(chainId:", network.chainId.toString() + ")");
     console.log("");
 
-    const ShieldFactory = await ethers.getContractFactory("ShieldFactory");
-    const factory = await ShieldFactory.deploy();
+    const QryptSafe = await ethers.getContractFactory("QryptSafe");
+    const factory = await QryptSafe.deploy();
     await factory.waitForDeployment();
 
     const factoryAddress = await factory.getAddress();
     const implAddress = await factory.vaultImplementation();
 
-    console.log("ShieldFactory deployed to:", factoryAddress);
-    console.log("PersonalVault implementation:", implAddress);
+    console.log("QryptSafe (factory) deployed to:", factoryAddress);
+    console.log("PersonalQryptSafe implementation:", implAddress);
     console.log("");
     console.log("Set these env vars in your frontend:");
     if (network.chainId === 11155111n) {
