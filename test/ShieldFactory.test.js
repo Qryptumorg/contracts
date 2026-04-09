@@ -34,7 +34,7 @@ describe("ShieldFactory", function () {
   });
 
   describe("createVault", function () {
-    it("creates a QRYPTANK for the caller", async function () {
+    it("creates a Qrypt-Safe for the caller", async function () {
       await factory.connect(user1).createVault(passwordHash);
       expect(await factory.hasVault(user1.address)).to.equal(true);
     });
@@ -53,11 +53,11 @@ describe("ShieldFactory", function () {
       );
     });
 
-    it("reverts if user already has a QRYPTANK", async function () {
+    it("reverts if user already has a Qrypt-Safe", async function () {
       await factory.connect(user1).createVault(passwordHash);
       await expect(
         factory.connect(user1).createVault(passwordHash)
-      ).to.be.revertedWith("QRYPTANK already exists for this wallet");
+      ).to.be.revertedWith("Qrypt-Safe already exists for this wallet");
     });
 
     it("creates separate vaults for different users", async function () {
@@ -78,15 +78,15 @@ describe("ShieldFactory", function () {
   });
 
   describe("hasVault / getVault", function () {
-    it("returns false for wallet with no QRYPTANK", async function () {
+    it("returns false for wallet with no Qrypt-Safe", async function () {
       expect(await factory.hasVault(user1.address)).to.equal(false);
     });
 
-    it("returns zero address for wallet with no QRYPTANK", async function () {
+    it("returns zero address for wallet with no Qrypt-Safe", async function () {
       expect(await factory.getVault(user1.address)).to.equal(ethers.ZeroAddress);
     });
 
-    it("returns true after QRYPTANK creation", async function () {
+    it("returns true after Qrypt-Safe creation", async function () {
       await factory.connect(user1).createVault(passwordHash);
       expect(await factory.hasVault(user1.address)).to.equal(true);
     });
