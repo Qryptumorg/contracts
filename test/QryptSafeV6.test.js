@@ -413,7 +413,8 @@ describe("QryptSafeV6", function () {
             await vault.connect(owner).shield(await token.getAddress(), SHIELD_AMOUNT * 2n, chain[99]);
             await vault.connect(owner).fundAirBudget(await token.getAddress(), SHIELD_AMOUNT, chain[98]);
 
-            deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
+            const latestBlock = await ethers.provider.getBlock("latest");
+            deadline = BigInt(latestBlock.timestamp + 3600);
             nonce = ethers.keccak256(ethers.toUtf8Bytes("test-nonce-1"));
             transferCodeHash = ethers.keccak256(ethers.toUtf8Bytes("secret-code"));
         });
