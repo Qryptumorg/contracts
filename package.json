@@ -11,7 +11,11 @@
     "verify:mainnet": "hardhat run scripts/verify.js --network mainnet",
     "verify:qtoken:sepolia": "hardhat run scripts/verify-qtoken.js --network sepolia",
     "verify:qtoken:mainnet": "hardhat run scripts/verify-qtoken.js --network mainnet",
-    "node": "hardhat node"
+    "node": "hardhat node",
+    "deploy-verify:sepolia": "hardhat run scripts/deploy-and-verify.js --network sepolia",
+    "full-test:sepolia": "hardhat run scripts/full-test.js --network sepolia",
+    "deploy-verify:v6:sepolia": "hardhat run scripts/deploy-verify-v6.js --network sepolia",
+    "export-verify-input": "node scripts/export-verify-input.js"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
