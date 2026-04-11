@@ -7,12 +7,13 @@ require("solidity-coverage");
 
 module.exports = {
   solidity: {
-    version: "0.8.24",
+    version: "0.8.34",
     settings: {
       optimizer: {
         enabled: true,
         runs: 200,
       },
+      viaIR: true,
     },
   },
   networks: {
@@ -31,6 +32,9 @@ module.exports = {
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY || "",
+  },
+  sourcify: {
+    enabled: false,
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS === "true",
