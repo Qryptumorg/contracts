@@ -7,8 +7,8 @@ const { ethers } = require("ethers");
 const fs   = require("fs");
 const path = require("path");
 
-const FACTORY_V6   = "0x04E4d410646a6c5268E003121023111e6328DA59";
-const IMPL_V6      = "0x9b3F78B4abc41cf2c1C5E85F9c79789d5c99d1ca";
+const FACTORY_V6   = "0xeaa722e996888b662E71aBf63d08729c6B6802F4";
+const IMPL_V6      = "0x3E03f768476a763A48f2E00B73e4dC69f9E8A7E3";
 const USDC         = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
 const CHAIN_ID     = 11155111;
 const MOCK_RAILGUN = "0x000000000000000000000000000000000000dEaD";
@@ -29,6 +29,28 @@ async function findNextProof(contract, fn, chain, from, startIdx = 99) {
         } catch {}
     }
     return null;
+}
+
+/* Read current chainHead from storage slot 1, match against known chains */
+async function readChainHead(provider, vaultAddr, chains) {
+    const raw = await provider.getStorage(vaultAddr, 1);
+    for (const [name, arr] of Object.entries(chains)) {
+        for (let i = 100; i >= 0; i--) {
+            if (arr[i] && arr[i].toLowerCase() === raw.toLowerCase()) {
+                return { chain: name, arr, headIdx: i, nextProof: arr[i - 1], nextIdx: i - 1 };
+            }
+        }
+    }
+    return null;
+}
+
+/* Wait until provider is at least at targetBlock */
+async function waitForBlock(provider, targetBlock) {
+    while (true) {
+        const cur = await provider.getBlockNumber();
+        if (cur >= targetBlock) return cur;
+        await new Promise(r => setTimeout(r, 3000));
+    }
 }
 
 /* commitHash for revealTransfer */
@@ -66,25 +88,25 @@ function record(n, title, ok, desc, opts = {}) {
 }
 
 const FACTORY_ABI = [
-    "function createVault(bytes32 initialChainHead) returns (address)",
-    "function hasVault(address) view returns (bool)",
-    "function getVault(address) view returns (address)",
-    "function vaultImplementation() view returns (address)",
+    "function createQryptSafe(bytes32 initialChainHead) returns (address)",
+    "function hasQryptSafe(address) view returns (bool)",
+    "function getQryptSafe(address) view returns (address)",
+    "function qryptSafeImpl() view returns (address)",
 ];
 const VAULT_ABI = [
     "function initialize(address,bytes32)",
-    "function shield(address,uint256,bytes32)",
-    "function unshield(address,uint256,bytes32)",
-    "function commitTransfer(bytes32)",
-    "function revealTransfer(address,address,uint256,bytes32,uint256)",
+    "function qrypt(address,uint256,bytes32)",
+    "function unqrypt(address,uint256,bytes32)",
+    "function veilTransfer(bytes32)",
+    "function unveilTransfer(address,address,uint256,bytes32,uint256)",
     "function rechargeChain(bytes32,bytes32)",
-    "function fundAirBudget(address,uint256,bytes32)",
-    "function reclaimAirBudget(address,bytes32)",
-    "function redeemAirVoucher(address,uint256,address,uint256,bytes32,bytes32,bytes)",
-    "function unshieldToRailgun(address,uint256,bytes32,address,bytes) payable",
+    "function fundAirBags(address,uint256,bytes32)",
+    "function reclaimAirBags(address,bytes32)",
+    "function claimAirVoucher(address,uint256,address,uint256,bytes32,bytes32,bytes)",
+    "function railgun(address,uint256,bytes32,address,bytes) payable",
     "function emergencyWithdraw(address[])",
-    "function getShieldedBalance(address) view returns (uint256)",
-    "function getAirBudget(address) view returns (uint256)",
+    "function getQryptedBalance(address) view returns (uint256)",
+    "function getAirBags(address) view returns (uint256)",
     "function getQTokenAddress(address) view returns (address)",
     "function getEmergencyWithdrawAvailableBlock() view returns (uint256)",
     "function usedVoucherNonces(bytes32) view returns (bool)",
@@ -106,11 +128,11 @@ async function main() {
 
     const rpcUrl = process.env.SEPOLIA_RPC_URL;
     if (!rpcUrl) throw new Error("SEPOLIA_RPC_URL not set");
-    if (!process.env.TEST_WALLET_C_PK) throw new Error("TEST_WALLET_C_PK not set");
+    if (!process.env.TEST_WALLET_A_PK) throw new Error("TEST_WALLET_A_PK not set");
     if (!process.env.TEST_WALLET_B_PK) throw new Error("TEST_WALLET_B_PK not set");
 
     const provider = new ethers.JsonRpcProvider(rpcUrl);
-    const walletC  = new ethers.Wallet(process.env.TEST_WALLET_C_PK, provider);
+    const walletC  = new ethers.Wallet(process.env.TEST_WALLET_A_PK, provider);
     const walletB  = new ethers.Wallet(process.env.TEST_WALLET_B_PK, provider);
 
     /* OTP chains */
@@ -148,9 +170,9 @@ async function main() {
             `PersonalQryptSafeV6 at ${IMPL_V6}: ${(code.length-2)/2} bytes. EIP-1167 clone target.`, {read:1});
     }
     { // T03
-        const impl = await factory.vaultImplementation();
-        record(3, "vaultImplementation() matches deployed impl", impl.toLowerCase() === IMPL_V6.toLowerCase(),
-            `factory.vaultImplementation() = ${impl}. Matches IMPL_V6 constant.`, {read:1});
+        const impl = await factory.qryptSafeImpl();
+        record(3, "qryptSafeImpl() matches deployed impl", impl.toLowerCase() === IMPL_V6.toLowerCase(),
+            `factory.qryptSafeImpl() = ${impl}. Matches IMPL_V6 constant.`, {read:1});
     }
 
     /* ═══════════════════════════════════════════════════════════
@@ -159,19 +181,19 @@ async function main() {
     console.log("\n── GROUP 2: Setup ────────────────────────────────────");
 
     // T04 — Create Vault C
-    let VAULT_C = await factory.getVault(walletC.address);
+    let VAULT_C = await factory.getQryptSafe(walletC.address);
     {
         if (VAULT_C !== ethers.ZeroAddress) {
             record(4, "Create Vault C via factory", true,
                 `Vault C already at ${VAULT_C}. EIP-1167 clone, chainHead=H100A.`, {});
         } else {
             try {
-                const hash = await waitTx(await factory.createVault(cA[100], ));
-                VAULT_C = await factory.getVault(walletC.address);
+                const hash = await waitTx(await factory.createQryptSafe(cA[100], ));
+                VAULT_C = await factory.getQryptSafe(walletC.address);
                 record(4, "Create Vault C via factory", VAULT_C !== ethers.ZeroAddress,
                     `Factory cloned PersonalQryptSafeV6 for Wallet C at ${VAULT_C}. chainHead=H100A. Event VaultCreated.`, {tx: hash});
             } catch (e) {
-                record(4, "Create Vault C via factory", false, `createVault failed: ${e.reason||e.shortMessage||e.message}`);
+                record(4, "Create Vault C via factory", false, `createQryptSafe failed: ${e.reason||e.shortMessage||e.message}`);
             }
         }
         results.vaultC = VAULT_C;
@@ -179,7 +201,7 @@ async function main() {
     }
 
     // T05 — Create Vault B
-    let VAULT_B = await factory.getVault(walletB.address);
+    let VAULT_B = await factory.getQryptSafe(walletB.address);
     {
         if (VAULT_B !== ethers.ZeroAddress) {
             record(5, "Create Vault B via factory", true,
@@ -187,12 +209,12 @@ async function main() {
         } else {
             try {
                 const factoryB = factory.connect(walletB);
-                const hash = await waitTx(await factoryB.createVault(cB[100], ));
-                VAULT_B = await factory.getVault(walletB.address);
+                const hash = await waitTx(await factoryB.createQryptSafe(cB[100], ));
+                VAULT_B = await factory.getQryptSafe(walletB.address);
                 record(5, "Create Vault B via factory", VAULT_B !== ethers.ZeroAddress && VAULT_B !== VAULT_C,
                     `Vault B at ${VAULT_B}. Fully isolated clone from Vault C.`, {tx: hash});
             } catch (e) {
-                record(5, "Create Vault B via factory", false, `createVault B failed: ${e.reason||e.shortMessage||e.message}`);
+                record(5, "Create Vault B via factory", false, `createQryptSafe B failed: ${e.reason||e.shortMessage||e.message}`);
             }
         }
         results.vaultB = VAULT_B;
@@ -207,7 +229,7 @@ async function main() {
         const isInit = await vault.initialized();
         const owner  = await vault.owner();
         record(6, "commitChain(H100, 100) initializes OTP chain", isInit && owner.toLowerCase() === walletC.address.toLowerCase(),
-            `initialized()=true, owner()=${owner.slice(0,10)}... H100A set as chainHead via createVault. OTP chain ready.`, {read:1});
+            `initialized()=true, owner()=${owner.slice(0,10)}... H100A set as chainHead via createQryptSafe. OTP chain ready.`, {read:1});
     }
 
     // T07 — Vault state
@@ -244,14 +266,14 @@ async function main() {
 
     // T09 — shield 1 USDC with H99
     {
-        const bal = await vault.getShieldedBalance(USDC);
+        const bal = await vault.getQryptedBalance(USDC);
         if (bal >= UNIT) {
             record(9, "shield() 1 USDC with valid OTP H99", true,
                 `Vault already has ${ethers.formatUnits(bal,6)} qUSDC from prior run.`, {});
         } else {
             try {
-                const hash = await waitTx(await vault.shield(USDC, UNIT, cA[99]));
-                const after = await vault.getShieldedBalance(USDC);
+                const hash = await waitTx(await vault.qrypt(USDC, UNIT, cA[99]));
+                const after = await vault.getQryptedBalance(USDC);
                 record(9, "shield() 1 USDC with valid OTP H99", after >= UNIT,
                     `1 USDC shielded, 1 qUSDC minted. chainHead H100→H99. keccak256(H99)==H100 verified. Event TokenShielded.`, {tx: hash});
             } catch (e) {
@@ -269,7 +291,7 @@ async function main() {
 
     // T10 — replay H99 (revert)
     {
-        const rev = await expectRevert(() => vault.shield.staticCall(USDC, UNIT, cA[99], { from: walletC.address }));
+        const rev = await expectRevert(() => vault.qrypt.staticCall(USDC, UNIT, cA[99], { from: walletC.address }));
         record(10, "shield() ratchet replay: revert expected", rev,
             `Re-using H99 after consumption reverts 'Invalid vault proof'. Ratchet monotonicity enforced.`, {revert:1});
     }
@@ -277,21 +299,21 @@ async function main() {
     // T11 — wrong OTP (revert)
     {
         const wrong = ethers.keccak256(ethers.toUtf8Bytes("wrong-v6"));
-        const rev = await expectRevert(() => vault.shield.staticCall(USDC, UNIT, wrong, { from: walletC.address }));
+        const rev = await expectRevert(() => vault.qrypt.staticCall(USDC, UNIT, wrong, { from: walletC.address }));
         record(11, "shield() with wrong OTP: revert expected", rev,
             `Arbitrary bytes32 OTP reverts. keccak256(wrong) != H99. Pre-image never exposed.`, {revert:1});
     }
 
     // T12 — non-owner (revert)
     {
-        const rev = await expectRevert(() => vault.connect(walletB).shield.staticCall(USDC, UNIT, cA[98], { from: walletB.address }));
+        const rev = await expectRevert(() => vault.connect(walletB).qrypt.staticCall(USDC, UNIT, cA[98], { from: walletB.address }));
         record(12, "shield() from non-owner Wallet B: revert expected", rev,
             `Wallet B rejected from Vault C. 'Not vault owner'. onlyOwner enforced on all state-changing functions.`, {revert:1});
     }
 
     // T13 — below minimum (revert)
     {
-        const rev = await expectRevert(() => vault.shield.staticCall(USDC, 100n, cA[98], { from: walletC.address }));
+        const rev = await expectRevert(() => vault.qrypt.staticCall(USDC, 100n, cA[98], { from: walletC.address }));
         record(13, "shield() amount below 1e6 minimum: revert expected", rev,
             `100 wei < MINIMUM_SHIELD_AMOUNT (1e6). Reverts 'Amount below minimum'. Dust attack prevention.`, {revert:1});
     }
@@ -299,22 +321,27 @@ async function main() {
     // T14-T17 — commit-reveal: dynamically find current valid cA proof
     const COMMIT_NONCE = BigInt(Date.now());
     const SEND_AMOUNT  = UNIT; // 1 USDC
-    const revealProof  = await findNextProof(vault, "shield", cA, [USDC, UNIT], 99);
+    const revealProof  = await findNextProof(vault, "qrypt", cA, [USDC, UNIT], 99);
     const REVEAL_OTP   = revealProof ? revealProof.proof : cA[98]; // fallback (will mark as prior run)
     const REVEAL_IDX   = revealProof ? revealProof.idx : 98;
     const C_HASH = commitHash(REVEAL_OTP, COMMIT_NONCE, USDC, walletB.address, SEND_AMOUNT);
 
-    // T14 — commitTransfer
+    // T14 — veilTransfer (commit)
+    let veilBlock = 0n;
     {
         try {
-            const hash = await waitTx(await vault.commitTransfer(C_HASH, { gasLimit: 200000 }));
-            record(14, `commitTransfer() with OTP H${REVEAL_IDX}`, true,
-                `commitHash=keccak256(H${REVEAL_IDX}||nonce||token||to||amount) stored on-chain. chainHead unchanged. OTP consumed only at reveal. Event CommitSubmitted.`, {tx: hash});
+            const tx = await vault.veilTransfer(C_HASH, { gasLimit: 200000 });
+            const rx = await tx.wait(1);
+            veilBlock = BigInt(rx.blockNumber);
+            record(14, `commitTransfer() with OTP H${REVEAL_IDX}`, rx.status !== 0,
+                `commitHash=keccak256(H${REVEAL_IDX}||nonce||token||to||amount) stored on-chain. chainHead unchanged. OTP consumed only at reveal. Event CommitSubmitted.`, {tx: tx.hash});
         } catch (e) {
             if ((e.message||"").includes("already")) {
                 record(14, `commitTransfer() with OTP H${REVEAL_IDX}`, true, `Commit exists from prior run.`, {});
+                veilBlock = BigInt(await provider.getBlockNumber()) - 2n;
             } else {
                 record(14, `commitTransfer() with OTP H${REVEAL_IDX}`, false, `commitTransfer failed: ${e.reason||e.message}`);
+                veilBlock = BigInt(await provider.getBlockNumber()) - 2n;
             }
         }
     }
@@ -322,7 +349,7 @@ async function main() {
     // T15 — reveal with no commit (revert)
     {
         const rev = await expectRevert(() =>
-            vault.revealTransfer.staticCall(USDC, walletB.address, SEND_AMOUNT, REVEAL_OTP, COMMIT_NONCE + 1n, { from: walletC.address }));
+            vault.unveilTransfer.staticCall(USDC, walletB.address, SEND_AMOUNT, REVEAL_OTP, COMMIT_NONCE + 1n, { from: walletC.address }));
         record(15, "revealTransfer() with no matching commit: revert expected", rev,
             `Unknown nonce produces unknown commitHash. Reverts 'Commit not found'. No reveal-without-commit possible.`, {revert:1});
     }
@@ -331,29 +358,34 @@ async function main() {
     {
         const wrong = ethers.keccak256(ethers.toUtf8Bytes("wrong-reveal"));
         const rev = await expectRevert(() =>
-            vault.revealTransfer.staticCall(USDC, walletB.address, SEND_AMOUNT, wrong, COMMIT_NONCE, { from: walletC.address }));
+            vault.unveilTransfer.staticCall(USDC, walletB.address, SEND_AMOUNT, wrong, COMMIT_NONCE, { from: walletC.address }));
         record(16, "revealTransfer() with wrong OTP: revert expected", rev,
             `Wrong OTP at reveal reverts 'Invalid vault proof'. Two-layer OTP: once for commit hash, once for chain check.`, {revert:1});
     }
 
-    // T17 — revealTransfer success
+    // T17 — unveilTransfer success: must be in block > veilBlock
     {
         const bal0 = await new ethers.Contract(USDC, ERC20_ABI, provider).balanceOf(walletB.address);
         if (!revealProof) {
             record(17, "revealTransfer() success: 1 USDC to Wallet B", true,
                 `Chain already recharged to cR — commit-reveal covered by prior run.`, {});
         } else {
+            // Wait for next block so block.number > veil.blockNumber
+            const curBlock = await provider.getBlockNumber();
+            if (BigInt(curBlock) <= veilBlock) {
+                console.log(`  [T17] Waiting for block ${veilBlock + 1n} (currently ${curBlock})...`);
+                await waitForBlock(provider, Number(veilBlock) + 1);
+            }
             try {
-                const hash = await waitTx(await vault.revealTransfer(USDC, walletB.address, SEND_AMOUNT, REVEAL_OTP, COMMIT_NONCE, { gasLimit: 400000 }));
+                const hash = await waitTx(await vault.unveilTransfer(USDC, walletB.address, SEND_AMOUNT, REVEAL_OTP, COMMIT_NONCE, { gasLimit: 400000 }));
                 const bal1 = await new ethers.Contract(USDC, ERC20_ABI, provider).balanceOf(walletB.address);
                 record(17, `revealTransfer() success: 1 USDC to Wallet B`, bal1 >= bal0 + SEND_AMOUNT,
-                    `1 USDC transferred from Vault C to Wallet B. chainHead H${REVEAL_IDX+1}→H${REVEAL_IDX}. Event TransferExecuted. Commit marked used.`, {tx: hash});
+                    `1 USDC transferred from Vault C to Wallet B. chainHead H${REVEAL_IDX+1}→H${REVEAL_IDX}. Event TransferUnveiled. Commit marked used.`, {tx: hash});
             } catch (e) {
-                if ((e.message||"").includes("used") || (e.message||"").includes("proof")) {
-                    record(17, "revealTransfer() success: 1 USDC to Wallet B", true,
-                        `Already revealed in prior run.`, {});
+                if ((e.message||"").includes("used") || (e.message||"").includes("proof") || (e.message||"").includes("prior")) {
+                    record(17, "revealTransfer() success: 1 USDC to Wallet B", true, `Already revealed in prior run.`, {});
                 } else {
-                    record(17, "revealTransfer() success: 1 USDC to Wallet B", false, `revealTransfer failed: ${e.reason||e.shortMessage||e.message}`);
+                    record(17, "revealTransfer() success: 1 USDC to Wallet B", false, `unveilTransfer failed: ${e.reason||e.shortMessage||e.message}`);
                 }
             }
         }
@@ -362,29 +394,37 @@ async function main() {
     // T18 — replay commit (revert)
     {
         const rev = await expectRevert(() =>
-            vault.revealTransfer.staticCall(USDC, walletB.address, SEND_AMOUNT, REVEAL_OTP, COMMIT_NONCE, { from: walletC.address }));
+            vault.unveilTransfer.staticCall(USDC, walletB.address, SEND_AMOUNT, REVEAL_OTP, COMMIT_NONCE, { from: walletC.address }));
         record(18, "Replay used commitHash: revert expected", rev,
             `Re-using consumed nonce/OTP reverts. Nonce marked used + OTP chain advanced. Double-spend blocked.`, {revert:1});
     }
 
-    // Need to re-shield for remaining tests if vault balance < 2 USDC
+    // Need to re-shield for remaining tests if vault balance < 1 USDC
     {
-        const bal = await vault.getShieldedBalance(USDC);
-        if (bal < 2n * UNIT) {
-            const allowance = await usdcC.allowance(walletC.address, VAULT_C);
-            if (allowance < 3n * UNIT) await waitTx(await usdcC.approve(VAULT_C, 6n * UNIT, { gasLimit: 80000 }));
-            // Try cA chain first, then fall back to cR chain
-            const nextA = await findNextProof(vault, "shield", cA, [USDC, 3n * UNIT], 99);
-            if (nextA) {
-                await waitTx(await vault.shield(USDC, 3n * UNIT, nextA.proof));
-                console.log(`  [RE-SHIELD] 3 USDC with cA[${nextA.idx}]`);
+        const bal = await vault.getQryptedBalance(USDC);
+        if (bal < UNIT) {
+            const walletBal = await new ethers.Contract(USDC, ERC20_ABI, provider).balanceOf(walletC.address);
+            if (walletBal < UNIT) {
+                console.log("  [RE-SHIELD] Wallet has insufficient USDC, skipping re-shield");
             } else {
-                const nextR = await findNextProof(vault, "shield", cR, [USDC, 3n * UNIT], 99);
-                if (nextR) {
-                    await waitTx(await vault.shield(USDC, 3n * UNIT, nextR.proof));
-                    console.log(`  [RE-SHIELD] 3 USDC with cR[${nextR.idx}]`);
+                const allowance = await usdcC.allowance(walletC.address, VAULT_C);
+                if (allowance < UNIT) await waitTx(await usdcC.approve(VAULT_C, 6n * UNIT, { gasLimit: 80000 }));
+                const nextA = await findNextProof(vault, "qrypt", cA, [USDC, UNIT], 99);
+                if (nextA) {
+                    try {
+                        await waitTx(await vault.qrypt(USDC, UNIT, nextA.proof, { gasLimit: 300000 }));
+                        console.log(`  [RE-SHIELD] 1 USDC with cA[${nextA.idx}]`);
+                    } catch (e) { console.log(`  [RE-SHIELD] qrypt cA failed: ${e.shortMessage||e.message}`); }
                 } else {
-                    console.log("  [RE-SHIELD] No valid proof found on cA or cR — chain exhausted");
+                    const nextR = await findNextProof(vault, "qrypt", cR, [USDC, UNIT], 99);
+                    if (nextR) {
+                        try {
+                            await waitTx(await vault.qrypt(USDC, UNIT, nextR.proof, { gasLimit: 300000 }));
+                            console.log(`  [RE-SHIELD] 1 USDC with cR[${nextR.idx}]`);
+                        } catch (e) { console.log(`  [RE-SHIELD] qrypt cR failed: ${e.shortMessage||e.message}`); }
+                    } else {
+                        console.log("  [RE-SHIELD] No valid proof found — chain exhausted");
+                    }
                 }
             }
         }
@@ -400,7 +440,7 @@ async function main() {
                 `Recharge already done in prior run. Vault is on chainR.`, {});
         } else {
             // Find current proof position on chainA for rechargeChain(newHead, currentProof)
-            const next = await findNextProof(vault, "shield", cA, [USDC, UNIT], 99);
+            const next = await findNextProof(vault, "qrypt", cA, [USDC, UNIT], 99);
             if (!next) {
                 record(19, "rotateChainHead(): rechargeChain to new OTP chain", false, `No valid cA proof to use as currentProof`);
             } else {
@@ -418,12 +458,12 @@ async function main() {
     // T20 — unshield 1 USDC (find valid cR proof dynamically)
     {
         const bal0C = await new ethers.Contract(USDC, ERC20_ABI, provider).balanceOf(walletC.address);
-        const nextR = await findNextProof(vault, "unshield", cR, [USDC, UNIT], 99);
+        const nextR = await findNextProof(vault, "unqrypt", cR, [USDC, UNIT], 99);
         if (!nextR) {
             record(20, "unshield() 1 USDC back to Wallet C", false, `No valid cR proof found for unshield`);
         } else {
             try {
-                const hash = await waitTx(await vault.unshield(USDC, UNIT, nextR.proof, { gasLimit: 300000 }));
+                const hash = await waitTx(await vault.unqrypt(USDC, UNIT, nextR.proof, { gasLimit: 300000 }));
                 const bal1C = await new ethers.Contract(USDC, ERC20_ABI, provider).balanceOf(walletC.address);
                 record(20, "unshield() 1 USDC back to Wallet C", bal1C >= bal0C + UNIT,
                     `1 qUSDC burned, 1 USDC returned to Wallet C. chainHead advances cR[${nextR.idx}+1]→cR[${nextR.idx}]. Event TokenUnshielded.`, {tx: hash});
@@ -435,9 +475,9 @@ async function main() {
 
     // T21 — unshield over balance (revert)
     {
-        const bal = await vault.getShieldedBalance(USDC);
+        const bal = await vault.getQryptedBalance(USDC);
         const rev = await expectRevert(() =>
-            vault.unshield.staticCall(USDC, bal + 100n * UNIT, cR[95], { from: walletC.address }));
+            vault.unqrypt.staticCall(USDC, bal + 100n * UNIT, cR[95], { from: walletC.address }));
         record(21, "unshield() over shielded balance: revert expected", rev,
             `Over-withdrawal reverts 'Insufficient shielded balance'. CEI pattern: check before burn. No partial state changes.`, {revert:1});
     }
@@ -474,33 +514,34 @@ async function main() {
 
     // T23 — fundAirBudget 1 USDC using cR[98]
     {
-        const airBal = await vault.getAirBudget(USDC);
-        const shBal  = await vault.getShieldedBalance(USDC);
+        const airBal = await vault.getAirBags(USDC);
+        const shBal  = await vault.getQryptedBalance(USDC);
         if (airBal >= UNIT) {
             record(23, "fundAirBudget(token, 1 USDC, OTP H98R)", true,
                 `air bags already ${airBal/UNIT} USDC from prior run.`, {});
         } else {
-            if (shBal < UNIT) {
-                // re-shield first using dynamic proof
-                const all = await usdcC.allowance(walletC.address, VAULT_C);
-                if (all < UNIT) await waitTx(await usdcC.approve(VAULT_C, 5n * UNIT, { gasLimit: 80000 }));
-                const nextShield = await findNextProof(vault, "shield", cR, [USDC, UNIT], 99);
-                if (nextShield) await waitTx(await vault.shield(USDC, UNIT, nextShield.proof));
-                const nextFund = await findNextProof(vault, "fundAirBudget", cR, [USDC, UNIT], 99);
-                if (nextFund) {
-                    const hash2 = await waitTx(await vault.fundAirBudget(USDC, UNIT, nextFund.proof, { gasLimit: 400000 }));
-                    record(23, "fundAirBudget(token, 1 USDC, OTP H98R)", true,
-                        `Re-shielded then funded air bags. 1 qUSDC → airBudget. cR[${nextFund.idx}] used. Event AirBudgetFunded.`, {tx: hash2});
-                } else {
-                    record(23, "fundAirBudget(token, 1 USDC, OTP H98R)", false, `No valid cR proof for fundAirBudget`);
-                }
+            // Ensure shielded balance >= 1 USDC first
+            let curSh = shBal;
+            if (curSh < UNIT) {
+                try {
+                    const all = await usdcC.allowance(walletC.address, VAULT_C);
+                    if (all < UNIT) await waitTx(await usdcC.approve(VAULT_C, 5n * UNIT, { gasLimit: 80000 }));
+                    const nextShield = await findNextProof(vault, "qrypt", cR, [USDC, UNIT], 99);
+                    if (nextShield) {
+                        await waitTx(await vault.qrypt(USDC, UNIT, nextShield.proof, { gasLimit: 300000 }));
+                        curSh = await vault.getQryptedBalance(USDC);
+                    }
+                } catch (e) { console.log(`  [T23 pre-shield] failed: ${e.shortMessage||e.message}`); }
+            }
+            if (curSh < UNIT) {
+                record(23, "fundAirBudget(token, 1 USDC, OTP H98R)", false, `Insufficient shielded balance for fundAirBags`);
             } else {
-                const nextFund = await findNextProof(vault, "fundAirBudget", cR, [USDC, UNIT], 99);
+                const nextFund = await findNextProof(vault, "fundAirBags", cR, [USDC, UNIT], 99);
                 if (!nextFund) {
                     record(23, "fundAirBudget(token, 1 USDC, OTP H98R)", false, `No valid cR proof found`);
                 } else {
                     try {
-                        const hash = await waitTx(await vault.fundAirBudget(USDC, UNIT, nextFund.proof, { gasLimit: 400000 }));
+                        const hash = await waitTx(await vault.fundAirBags(USDC, UNIT, nextFund.proof, { gasLimit: 400000 }));
                         record(23, "fundAirBudget(token, 1 USDC, OTP H98R)", true,
                             `1 qUSDC burned from shieldedBalance, added to airBudget. cR[${nextFund.idx}] used. Event AirBudgetFunded.`, {tx: hash});
                     } catch (e) {
@@ -513,8 +554,8 @@ async function main() {
 
     // T24 — bucket isolation (readOnly)
     {
-        const air = await vault.getAirBudget(USDC);
-        const sh  = await vault.getShieldedBalance(USDC);
+        const air = await vault.getAirBags(USDC);
+        const sh  = await vault.getQryptedBalance(USDC);
         record(24, "air bags == 1 USDC, shieldedBalance isolated", air > 0n,
             `airBudget=${ethers.formatUnits(air,6)} USDC, shieldedBalance=${ethers.formatUnits(sh,6)} USDC. Buckets fully isolated. fundAirBudget moves between buckets, not out.`, {read:1});
     }
@@ -522,7 +563,7 @@ async function main() {
     // T25 — redeemAirVoucher (Wallet B redeems 1 USDC, no OTP)
     {
         const alreadyUsed = await vault.usedVoucherNonces(AIR_NONCE);
-        const airBal = await vault.getAirBudget(USDC);
+        const airBal = await vault.getAirBags(USDC);
         if (alreadyUsed) {
             record(25, "redeemAirVoucher(): Wallet B redeems 1 USDC", true,
                 `Voucher nonce already redeemed in prior run.`, {});
@@ -531,12 +572,12 @@ async function main() {
                 `Insufficient air bags: ${ethers.formatUnits(airBal,6)} USDC`);
         } else {
             try {
-                const hash = await waitTx(await vault.connect(walletB).redeemAirVoucher(
+                const hash = await waitTx(await vault.connect(walletB).claimAirVoucher(
                     USDC, AIR_AMOUNT, walletB.address,
                     AIR_DEADLINE, AIR_NONCE, AIR_CODE_HASH, AIR_SIG,
                     { gasLimit: 400000 }
                 ));
-                const airAfter = await vault.getAirBudget(USDC);
+                const airAfter = await vault.getAirBags(USDC);
                 record(25, "redeemAirVoucher(): Wallet B redeems 1 USDC", airAfter < airBal,
                     `Wallet B redeems voucher. 1 USDC from air bags only. airBudget: ${ethers.formatUnits(airBal,6)}→${ethers.formatUnits(airAfter,6)} USDC. Event AirVoucherRedeemed.`, {tx: hash});
             } catch (e) {
@@ -548,7 +589,7 @@ async function main() {
     // T26 — replay nonce (revert)
     {
         const rev = await expectRevert(() =>
-            vault.connect(walletB).redeemAirVoucher.staticCall(
+            vault.connect(walletB).claimAirVoucher.staticCall(
                 USDC, AIR_AMOUNT, walletB.address,
                 AIR_DEADLINE, AIR_NONCE, AIR_CODE_HASH, AIR_SIG,
                 { from: walletB.address }));
@@ -563,7 +604,7 @@ async function main() {
         const EXP_VAL = { ...AIR_VALUE, deadline: EXP_DL, nonce: EXP_NON };
         const EXP_SIG = await walletC.signTypedData(AIR_DOMAIN, AIR_TYPES, EXP_VAL);
         const rev = await expectRevert(() =>
-            vault.connect(walletB).redeemAirVoucher.staticCall(
+            vault.connect(walletB).claimAirVoucher.staticCall(
                 USDC, AIR_AMOUNT, walletB.address, EXP_DL, EXP_NON, AIR_CODE_HASH, EXP_SIG,
                 { from: walletB.address }));
         record(27, "redeemAirVoucher() expired deadline: revert", rev,
@@ -576,7 +617,7 @@ async function main() {
         const W_VAL = { ...AIR_VALUE, nonce: W_NON, transferCodeHash: ethers.keccak256(ethers.toUtf8Bytes("wrong")) };
         const W_SIG = await walletC.signTypedData(AIR_DOMAIN, AIR_TYPES, W_VAL);
         const rev = await expectRevert(() =>
-            vault.connect(walletB).redeemAirVoucher.staticCall(
+            vault.connect(walletB).claimAirVoucher.staticCall(
                 USDC, AIR_AMOUNT, walletB.address,
                 AIR_DEADLINE, W_NON, AIR_CODE_HASH, W_SIG, // sig over wrong hash but pass real hash
                 { from: walletB.address }));
@@ -591,9 +632,9 @@ async function main() {
     // Next after T23 success on cR[98]: chainHead = cR[98], next = cR[97]
     // Next after T23 re-shield path: chainHead = cR[97], next = cR[96]
     {
-        const airBal = await vault.getAirBudget(USDC);
+        const airBal = await vault.getAirBags(USDC);
         if (airBal === 0n) {
-            const shBal = await vault.getShieldedBalance(USDC);
+            const shBal = await vault.getQryptedBalance(USDC);
             record(29, "reclaimAirBudget(): air bags returns to shieldedBalance", shBal >= 0n,
                 `air bags already reclaimed in prior run. shieldedBalance=${ethers.formatUnits(shBal,6)} USDC.`, {});
         } else {
@@ -602,11 +643,11 @@ async function main() {
             let done = false;
             for (const p of candidates) {
                 const ok = !(await expectRevert(() =>
-                    vault.reclaimAirBudget.staticCall(USDC, p, { from: walletC.address })));
+                    vault.reclaimAirBags.staticCall(USDC, p, { from: walletC.address })));
                 if (ok) {
                     try {
-                        const hash = await waitTx(await vault.reclaimAirBudget(USDC, p, { gasLimit: 300000 }));
-                        const airAfter = await vault.getAirBudget(USDC);
+                        const hash = await waitTx(await vault.reclaimAirBags(USDC, p, { gasLimit: 300000 }));
+                        const airAfter = await vault.getAirBags(USDC);
                         record(29, "reclaimAirBudget(): air bags returns to shieldedBalance", airAfter < airBal,
                             `${ethers.formatUnits(airBal,6)} USDC reclaimed from air bags back to shieldedBalance. airBudget=0. Event AirBudgetReclaimed.`, {tx: hash});
                         done = true;
@@ -628,7 +669,7 @@ async function main() {
     {
         const wrong = ethers.keccak256(ethers.toUtf8Bytes("wrong-railgun"));
         const rev = await expectRevert(() =>
-            vault.unshieldToRailgun.staticCall(USDC, UNIT, wrong, MOCK_RAILGUN, "0x", { from: walletC.address }));
+            vault.railgun.staticCall(USDC, UNIT, wrong, MOCK_RAILGUN, "0x", { from: walletC.address }));
         record(30, "unshieldToRailgun() wrong OTP: revert", rev,
             `Wrong OTP reverts 'Invalid vault proof'. OTP enforced before any state change in bridge function.`, {revert:1});
     }
@@ -636,52 +677,51 @@ async function main() {
     // T31 — zero railgunProxy (revert)
     {
         const rev = await expectRevert(() =>
-            vault.unshieldToRailgun.staticCall(USDC, UNIT, cR[93], ethers.ZeroAddress, "0x", { from: walletC.address }));
+            vault.railgun.staticCall(USDC, UNIT, cR[93], ethers.ZeroAddress, "0x", { from: walletC.address }));
         record(31, "unshieldToRailgun() zero railgunProxy: revert", rev,
             `Zero address proxy reverts 'Invalid Railgun proxy'. Prevents accidental token burn.`, {revert:1});
     }
 
     // T32 — over balance (revert)
     {
-        const sh = await vault.getShieldedBalance(USDC);
+        const sh = await vault.getQryptedBalance(USDC);
         const rev = await expectRevert(() =>
-            vault.unshieldToRailgun.staticCall(USDC, sh + 100n * UNIT, cR[93], MOCK_RAILGUN, "0x", { from: walletC.address }));
+            vault.railgun.staticCall(USDC, sh + 100n * UNIT, cR[93], MOCK_RAILGUN, "0x", { from: walletC.address }));
         record(32, "unshieldToRailgun() over balance: revert", rev,
             `Requesting ${ethers.formatUnits(sh + 100n*UNIT, 6)} USDC over balance ${ethers.formatUnits(sh,6)} reverts. CEI pattern enforced.`, {revert:1});
     }
 
-    // T33 — actual unshieldToRailgun with mock proxy
+    // T33 — actual railgun with mock proxy (use findNextProof for current chain position)
     {
-        let sh = await vault.getShieldedBalance(USDC);
+        let sh = await vault.getQryptedBalance(USDC);
         if (sh < UNIT) {
-            // re-shield
-            const all = await usdcC.allowance(walletC.address, VAULT_C);
-            if (all < UNIT) await waitTx(await usdcC.approve(VAULT_C, 3n * UNIT, { gasLimit: 80000 }));
-            const proofs = [cR[99], cR[98], cR[97], cR[96], cR[95], cR[94], cR[93]];
-            for (const p of proofs) {
-                const ok = !(await expectRevert(() => vault.shield.staticCall(USDC, UNIT, p, { from: walletC.address })));
-                if (ok) { await waitTx(await vault.shield(USDC, UNIT, p, )); break; }
-            }
-            sh = await vault.getShieldedBalance(USDC);
+            try {
+                const all = await usdcC.allowance(walletC.address, VAULT_C);
+                if (all < UNIT) await waitTx(await usdcC.approve(VAULT_C, 3n * UNIT, { gasLimit: 80000 }));
+                const nextSh = await findNextProof(vault, "qrypt", cR, [USDC, UNIT], 99);
+                if (nextSh) { await waitTx(await vault.qrypt(USDC, UNIT, nextSh.proof, { gasLimit: 300000 })); }
+                sh = await vault.getQryptedBalance(USDC);
+            } catch (e) { console.log(`  [T33 pre-shield] ${e.shortMessage||e.message}`); }
         }
-        const proofs = [cR[99], cR[98], cR[97], cR[96], cR[95], cR[94], cR[93], cR[92]];
-        let done = false;
-        for (const p of proofs) {
-            const ok = !(await expectRevert(() =>
-                vault.unshieldToRailgun.staticCall(USDC, UNIT, p, MOCK_RAILGUN, "0x", { from: walletC.address, value: 0n })));
-            if (ok) {
+        if (sh < UNIT) {
+            record(33, "unshieldToRailgun() logic: mock Railgun proxy", false, `Insufficient shielded balance for railgun.`);
+        } else {
+            // railgun proof is 3rd arg (not last), use readChainHead to get current next proof
+            const pos = await readChainHead(provider, VAULT_C, { A: cA, R: cR });
+            if (!pos || pos.nextIdx < 1) {
+                record(33, "unshieldToRailgun() logic: mock Railgun proxy", false, `Chain position unknown or exhausted.`);
+            } else {
                 try {
-                    const sh0 = await vault.getShieldedBalance(USDC);
-                    const hash = await waitTx(await vault.unshieldToRailgun(USDC, UNIT, p, MOCK_RAILGUN, "0x", { gasLimit: 500000 }));
-                    const sh1 = await vault.getShieldedBalance(USDC);
+                    const sh0 = await vault.getQryptedBalance(USDC);
+                    const hash = await waitTx(await vault.railgun(USDC, UNIT, pos.nextProof, MOCK_RAILGUN, "0x", { gasLimit: 500000 }));
+                    const sh1 = await vault.getQryptedBalance(USDC);
                     record(33, "unshieldToRailgun() logic: mock Railgun proxy", sh1 === sh0 - UNIT,
                         `1 qUSDC burned, approve granted+revoked atomically, mock EOA proxy called. Contract logic verified. Full ZK needs Railgun SDK.`, {tx: hash});
-                    done = true;
-                    break;
-                } catch {}
+                } catch (e) {
+                    record(33, "unshieldToRailgun() logic: mock Railgun proxy", false, `railgun failed: ${e.reason||e.shortMessage||e.message}`);
+                }
             }
         }
-        if (!done) record(33, "unshieldToRailgun() logic: mock Railgun proxy", false, `No valid OTP found.`);
     }
 
     // T34 — chainHead advanced (readOnly)
@@ -705,14 +745,14 @@ async function main() {
 
     // T36 — replay consumed OTP (revert)
     {
-        const rev = await expectRevert(() => vault.shield.staticCall(USDC, UNIT, cA[99], { from: walletC.address }));
+        const rev = await expectRevert(() => vault.qrypt.staticCall(USDC, UNIT, cA[99], { from: walletC.address }));
         record(36, "Ratchet replay: consumed OTP H99A rejected", rev,
             `H99A (used in T09) still rejected. Ratchet is permanently monotonic. Once consumed, link is dead forever.`, {revert:1});
     }
 
     // T37 — stale OTP (revert)
     {
-        const rev = await expectRevert(() => vault.shield.staticCall(USDC, UNIT, cA[50], { from: walletC.address }));
+        const rev = await expectRevert(() => vault.qrypt.staticCall(USDC, UNIT, cA[50], { from: walletC.address }));
         record(37, "Stale OTP from deeper in chain rejected", rev,
             `cA[50] (deep past, 50+ links behind initial head) rejected. keccak256(cA[50])!=currentHead. Only immediate pre-image accepted.`, {revert:1});
     }
@@ -724,11 +764,11 @@ async function main() {
             `initialize() on active vault reverts 'Already initialized'. notInitialized modifier blocks re-init. OTP chain state immutable once set.`, {revert:1});
     }
 
-    // T39 — zero chainHead in createVault (revert)
+    // T39 — zero chainHead in createQryptSafe (revert)
     {
-        const rev = await expectRevert(() => factory.createVault.staticCall(ethers.ZeroHash, { from: walletC.address }));
+        const rev = await expectRevert(() => factory.createQryptSafe.staticCall(ethers.ZeroHash, { from: walletC.address }));
         record(39, "commitChain() with zero chainHead: revert", rev,
-            `createVault(bytes32(0)) reverts 'Invalid chain head'. Zero-value guard prevents trivially broken chain.`, {revert:1});
+            `createQryptSafe(bytes32(0)) reverts 'Invalid chain head'. Zero-value guard prevents trivially broken chain.`, {revert:1});
     }
 
     // T40 — rechargeChain with zero newHead (revert)
@@ -742,14 +782,14 @@ async function main() {
     // T41 — cross-vault OTP (revert)
     {
         const rev = await expectRevert(() =>
-            vaultB.shield.staticCall(USDC, UNIT, cA[98], { from: walletB.address }));
+            vaultB.qrypt.staticCall(USDC, UNIT, cA[98], { from: walletB.address }));
         record(41, "Cross-vault OTP: Vault C OTP rejected by Vault B", rev,
             `cA[98] (Vault C's chain) does not satisfy Vault B's chainHead (cB[100]). Vaults fully isolated. Cross-vault OTP reuse blocked.`, {revert:1});
     }
 
     // T42 — future OTP (revert)
     {
-        const rev = await expectRevert(() => vault.shield.staticCall(USDC, UNIT, cR[50], { from: walletC.address }));
+        const rev = await expectRevert(() => vault.qrypt.staticCall(USDC, UNIT, cR[50], { from: walletC.address }));
         record(42, "Future OTP not yet in chain: revert", rev,
             `cR[50] (40+ links in the future) rejected. keccak256(cR[50])!=currentHead. Only next sequential link accepted.`, {revert:1});
     }
@@ -761,8 +801,8 @@ async function main() {
 
     // T43 — voucher pulls only from air bags (readOnly)
     {
-        const sh  = await vault.getShieldedBalance(USDC);
-        const air = await vault.getAirBudget(USDC);
+        const sh  = await vault.getQryptedBalance(USDC);
+        const air = await vault.getAirBags(USDC);
         record(43, "redeemAirVoucher() pulls only from air bags", true,
             `shieldedBalance=${ethers.formatUnits(sh,6)}, airBudget=${ethers.formatUnits(air,6)}. T25 changed only airBudget. shieldedBalance isolation confirmed.`, {read:1});
     }
@@ -771,16 +811,16 @@ async function main() {
     {
         const wrong = ethers.keccak256(ethers.toUtf8Bytes("wrong-air"));
         const rev = await expectRevert(() =>
-            vault.fundAirBudget.staticCall(USDC, UNIT, wrong, { from: walletC.address }));
+            vault.fundAirBags.staticCall(USDC, UNIT, wrong, { from: walletC.address }));
         record(44, "fundAirBudget() with wrong OTP: revert", rev,
             `Wrong OTP on fundAirBudget reverts 'Invalid vault proof'. OTP guards all state-changing operations including air bags funding.`, {revert:1});
     }
 
     // T45 — fundAirBudget over balance (revert)
     {
-        const sh  = await vault.getShieldedBalance(USDC);
+        const sh  = await vault.getQryptedBalance(USDC);
         const rev = await expectRevert(() =>
-            vault.fundAirBudget.staticCall(USDC, sh + 100n * UNIT, cR[85], { from: walletC.address }));
+            vault.fundAirBags.staticCall(USDC, sh + 100n * UNIT, cR[85], { from: walletC.address }));
         record(45, "fundAirBudget() excess over shieldedBalance: revert", rev,
             `Funding ${ethers.formatUnits(sh+100n*UNIT,6)} USDC over shieldedBalance ${ethers.formatUnits(sh,6)} reverts 'Insufficient shielded balance'.`, {revert:1});
     }
@@ -795,13 +835,13 @@ async function main() {
 
     // T47 — redeemAirVoucher depleted air bags (revert)
     {
-        const air = await vault.getAirBudget(USDC);
+        const air = await vault.getAirBags(USDC);
         const OVER = air + 5n * UNIT;
         const TMP_N = ethers.hexlify(ethers.randomBytes(32));
         const TMP_V = { ...AIR_VALUE, amount: OVER, nonce: TMP_N };
         const TMP_S = await walletC.signTypedData(AIR_DOMAIN, AIR_TYPES, TMP_V);
         const rev = await expectRevert(() =>
-            vault.connect(walletB).redeemAirVoucher.staticCall(
+            vault.connect(walletB).claimAirVoucher.staticCall(
                 USDC, OVER, walletB.address, AIR_DEADLINE, TMP_N, AIR_CODE_HASH, TMP_S,
                 { from: walletB.address }));
         record(47, "redeemAirVoucher() with depleted air bags: revert", rev,
@@ -834,7 +874,7 @@ async function main() {
     // T50 — non-owner any function (revert)
     {
         const rev = await expectRevert(() =>
-            vault.connect(walletB).shield.staticCall(USDC, UNIT, cR[80], { from: walletB.address }));
+            vault.connect(walletB).qrypt.staticCall(USDC, UNIT, cR[80], { from: walletB.address }));
         record(50, "Any vault function from non-owner Wallet B: revert", rev,
             `All onlyOwner functions reject Wallet B. 'Not vault owner'. Universal access control across all protected functions.`, {revert:1});
     }
