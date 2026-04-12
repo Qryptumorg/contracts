@@ -240,7 +240,7 @@ describe("QryptSafeV3", function () {
         const vaultAddr = await factory.getVault(owner.address);
         const tokenAddr = await token.getAddress();
         const nonce     = 1n;
-        const deadline  = BigInt(Math.floor(Date.now() / 1000) + 3600);
+        const deadline  = BigInt((await ethers.provider.getBlock("latest")).timestamp + 3600);
         const sig = await signMetaTransfer(owner, vaultAddr, tokenAddr, recipient.address, amount, nonce, deadline);
         await vault.connect(relayer).metaTransfer(tokenAddr, recipient.address, amount, nonce, deadline, sig);
         expect(await token.balanceOf(recipient.address)).to.equal(amount);
@@ -252,7 +252,7 @@ describe("QryptSafeV3", function () {
         const vaultAddr = await factory.getVault(owner.address);
         const tokenAddr = await token.getAddress();
         const nonce     = 2n;
-        const deadline  = BigInt(Math.floor(Date.now() / 1000) - 1);
+        const deadline  = BigInt((await ethers.provider.getBlock("latest")).timestamp - 1);
         const sig = await signMetaTransfer(owner, vaultAddr, tokenAddr, recipient.address, amount, nonce, deadline);
         await expect(vault.connect(relayer).metaTransfer(tokenAddr, recipient.address, amount, nonce, deadline, sig))
             .to.be.revertedWith("Meta-transfer expired");
@@ -264,7 +264,7 @@ describe("QryptSafeV3", function () {
         const vaultAddr = await factory.getVault(owner.address);
         const tokenAddr = await token.getAddress();
         const nonce     = 3n;
-        const deadline  = BigInt(Math.floor(Date.now() / 1000) + 3600);
+        const deadline  = BigInt((await ethers.provider.getBlock("latest")).timestamp + 3600);
         const sig = await signMetaTransfer(owner, vaultAddr, tokenAddr, recipient.address, amount, nonce, deadline);
         await vault.connect(relayer).metaTransfer(tokenAddr, recipient.address, amount, nonce, deadline, sig);
         await expect(vault.connect(relayer).metaTransfer(tokenAddr, recipient.address, amount, nonce, deadline, sig))
@@ -277,7 +277,7 @@ describe("QryptSafeV3", function () {
         const vaultAddr = await factory.getVault(owner.address);
         const tokenAddr = await token.getAddress();
         const nonce     = 4n;
-        const deadline  = BigInt(Math.floor(Date.now() / 1000) + 3600);
+        const deadline  = BigInt((await ethers.provider.getBlock("latest")).timestamp + 3600);
         const sig = await signMetaTransfer(attacker, vaultAddr, tokenAddr, recipient.address, amount, nonce, deadline);
         await expect(vault.connect(relayer).metaTransfer(tokenAddr, recipient.address, amount, nonce, deadline, sig))
             .to.be.revertedWith("Invalid signature");
@@ -300,7 +300,7 @@ describe("QryptSafeV3", function () {
         const vaultAddr = await factory.getVault(owner.address);
         const tokenAddr = await token.getAddress();
         const nonce     = 99n;
-        const deadline  = BigInt(Math.floor(Date.now() / 1000) + 3600);
+        const deadline  = BigInt((await ethers.provider.getBlock("latest")).timestamp + 3600);
         const sig = await signMetaTransfer(owner, vaultAddr, tokenAddr, recipient.address, USDC(50), nonce, deadline);
         await expect(vault.connect(relayer).metaTransfer(tokenAddr, recipient.address, USDC(50), nonce, deadline, sig))
             .to.be.revertedWith("Token not shielded");
