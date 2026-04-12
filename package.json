@@ -15,7 +15,9 @@
     "deploy-verify:sepolia": "hardhat run scripts/deploy-and-verify.js --network sepolia",
     "full-test:sepolia": "hardhat run scripts/full-test.js --network sepolia",
     "deploy-verify:v6:sepolia": "hardhat run scripts/deploy-verify-v6.js --network sepolia",
-    "export-verify-input": "node scripts/export-verify-input.js"
+    "export-verify-input": "node scripts/export-verify-input.js",
+    "test:v2": "hardhat test test/QryptSafeV2.test.js",
+    "deploy-verify:v2:sepolia": "hardhat run scripts/deploy-verify-v2.js --network sepolia"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.1.2",
