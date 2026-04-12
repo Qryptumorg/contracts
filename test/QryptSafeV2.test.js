@@ -5,11 +5,13 @@ const { expect } = require("chai");
       let factory, vault, token, owner, attacker, recipient, admin;
       const VAULT_PROOF = "def456";
       let passwordHash;
+      let proofBytes;
 
       beforeEach(async () => {
           [admin, owner, attacker, recipient] = await ethers.getSigners();
-          // zeroPadBytes so keccak256(bytes32(proof)) == passwordHash in Solidity validProof modifier
-          passwordHash = ethers.keccak256(ethers.zeroPadBytes(ethers.toUtf8Bytes(VAULT_PROOF), 32));
+          // FIX: zeroPadBytes(32) so keccak256(abi.encodePacked(bytes32)) matches stored hash
+          proofBytes = ethers.zeroPadBytes(ethers.toUtf8Bytes(VAULT_PROOF), 32);
+          passwordHash = ethers.keccak256(proofBytes);
           const MockERC20 = await ethers.getContractFactory("MockERC20");
           token = await MockERC20.deploy("USD Coin", "USDC", 6);
           const Factory = await ethers.getContractFactory("QryptSafeV2");
@@ -41,67 +43,68 @@ const { expect } = require("chai");
 
       // Shield
       it("shields tokens", async () => {
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes);
           expect(await vault.getShieldedBalance(await token.getAddress())).to.equal(ethers.parseUnits("100", 6));
       });
       it("rejects shield below minimum", async () => {
-          await expect(vault.connect(owner).shield(await token.getAddress(), 100, ethers.toUtf8Bytes(VAULT_PROOF)))
+          await expect(vault.connect(owner).shield(await token.getAddress(), 100, proofBytes))
               .to.be.revertedWith("Amount below minimum");
       });
       it("rejects shield with wrong proof", async () => {
-          await expect(vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes("wrong1")))
+          const wrongProof = ethers.zeroPadBytes(ethers.toUtf8Bytes("wrong1"), 32);
+          await expect(vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), wrongProof))
               .to.be.revertedWith("Invalid vault proof");
       });
       it("rejects shield from non-owner", async () => {
-          await expect(vault.connect(attacker).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF)))
+          await expect(vault.connect(attacker).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes))
               .to.be.revertedWith("Not vault owner");
       });
 
       // Unshield
       it("unshields tokens correctly", async () => {
           const amount = ethers.parseUnits("100", 6);
-          await vault.connect(owner).shield(await token.getAddress(), amount, ethers.toUtf8Bytes(VAULT_PROOF));
-          await vault.connect(owner).unshield(await token.getAddress(), amount, ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), amount, proofBytes);
+          await vault.connect(owner).unshield(await token.getAddress(), amount, proofBytes);
           expect(await vault.getShieldedBalance(await token.getAddress())).to.equal(0);
       });
       it("rejects unshield exceeding balance", async () => {
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF));
-          await expect(vault.connect(owner).unshield(await token.getAddress(), ethers.parseUnits("200", 6), ethers.toUtf8Bytes(VAULT_PROOF)))
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes);
+          await expect(vault.connect(owner).unshield(await token.getAddress(), ethers.parseUnits("200", 6), proofBytes))
               .to.be.revertedWith("Insufficient shielded balance");
       });
 
       // Commit-reveal
       it("commit stores nonce", async () => {
           const commitHash = ethers.keccak256(ethers.toUtf8Bytes("tx-001"));
-          await vault.connect(owner).commit(commitHash, ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).commit(commitHash, proofBytes);
           // nonce incremented internally, no revert = success
       });
       it("V2 fix: duplicate commit rejected", async () => {
           const commitHash = ethers.keccak256(ethers.toUtf8Bytes("tx-dup"));
-          await vault.connect(owner).commit(commitHash, ethers.toUtf8Bytes(VAULT_PROOF));
-          await expect(vault.connect(owner).commit(commitHash, ethers.toUtf8Bytes(VAULT_PROOF)))
+          await vault.connect(owner).commit(commitHash, proofBytes);
+          await expect(vault.connect(owner).commit(commitHash, proofBytes))
               .to.be.revertedWith("Commit already exists");
       });
       it("reveal transfers tokens", async () => {
           const amount = ethers.parseUnits("50", 6);
-          await vault.connect(owner).shield(await token.getAddress(), amount, ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), amount, proofBytes);
           const commitHash = ethers.keccak256(ethers.toUtf8Bytes("tx-reveal"));
-          await vault.connect(owner).commit(commitHash, ethers.toUtf8Bytes(VAULT_PROOF));
-          await vault.connect(owner).reveal(await token.getAddress(), recipient.address, amount, ethers.toUtf8Bytes(VAULT_PROOF), commitHash);
+          await vault.connect(owner).commit(commitHash, proofBytes);
+          await vault.connect(owner).reveal(await token.getAddress(), recipient.address, amount, proofBytes, commitHash);
           expect(await token.balanceOf(recipient.address)).to.equal(amount);
       });
       it("reveal rejects used commit", async () => {
           const amount = ethers.parseUnits("50", 6);
-          await vault.connect(owner).shield(await token.getAddress(), amount * 2n, ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), amount * 2n, proofBytes);
           const commitHash = ethers.keccak256(ethers.toUtf8Bytes("tx-used"));
-          await vault.connect(owner).commit(commitHash, ethers.toUtf8Bytes(VAULT_PROOF));
-          await vault.connect(owner).reveal(await token.getAddress(), recipient.address, amount, ethers.toUtf8Bytes(VAULT_PROOF), commitHash);
-          await expect(vault.connect(owner).reveal(await token.getAddress(), recipient.address, amount, ethers.toUtf8Bytes(VAULT_PROOF), commitHash))
+          await vault.connect(owner).commit(commitHash, proofBytes);
+          await vault.connect(owner).reveal(await token.getAddress(), recipient.address, amount, proofBytes, commitHash);
+          await expect(vault.connect(owner).reveal(await token.getAddress(), recipient.address, amount, proofBytes, commitHash))
               .to.be.revertedWith("Commit already used");
       });
       it("reveal rejects nonexistent commit", async () => {
           const fakeHash = ethers.keccak256(ethers.toUtf8Bytes("fake"));
-          await expect(vault.connect(owner).reveal(await token.getAddress(), recipient.address, 1000, ethers.toUtf8Bytes(VAULT_PROOF), fakeHash))
+          await expect(vault.connect(owner).reveal(await token.getAddress(), recipient.address, 1000, proofBytes, fakeHash))
               .to.be.revertedWith("Commit not found");
       });
 
@@ -112,35 +115,35 @@ const { expect } = require("chai");
           const vaultAddr = await factory.getVault(owner.address);
           await token2.mint(owner.address, ethers.parseUnits("500", 6));
           await token2.connect(owner).approve(vaultAddr, ethers.MaxUint256);
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF));
-          await vault.connect(owner).shield(await token2.getAddress(), ethers.parseUnits("200", 6), ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes);
+          await vault.connect(owner).shield(await token2.getAddress(), ethers.parseUnits("200", 6), proofBytes);
           expect(await vault.getShieldedBalance(await token.getAddress())).to.equal(ethers.parseUnits("100", 6));
           expect(await vault.getShieldedBalance(await token2.getAddress())).to.equal(ethers.parseUnits("200", 6));
       });
 
       // Emergency
       it("emergency withdraw enforces delay", async () => {
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF));
-          await expect(vault.connect(owner).emergencyWithdraw([await token.getAddress()], ethers.toUtf8Bytes(VAULT_PROOF)))
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes);
+          await expect(vault.connect(owner).emergencyWithdraw([await token.getAddress()], proofBytes))
               .to.be.revertedWith("Emergency delay not met");
       });
 
       // qToken
       it("qToken is non-transferable", async () => {
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes);
           const qAddr = await vault.getQTokenAddress(await token.getAddress());
           const qToken = await ethers.getContractAt("ShieldToken", qAddr);
           await expect(qToken.connect(owner).transfer(attacker.address, 1000)).to.be.reverted;
       });
 
       it("shields accumulate correctly", async () => {
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF));
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("50", 6), ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes);
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("50", 6), proofBytes);
           expect(await vault.getShieldedBalance(await token.getAddress())).to.equal(ethers.parseUnits("150", 6));
       });
 
       it("getQTokenAddress returns non-zero after first shield", async () => {
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes);
           expect(await vault.getQTokenAddress(await token.getAddress())).to.not.equal(ethers.ZeroAddress);
       });
 
@@ -148,10 +151,9 @@ const { expect } = require("chai");
           expect(await factory.getVault(owner.address)).to.not.equal(ethers.ZeroAddress);
       });
 
-      // FIX: unshield is 3-arg (tokenAddress, amount, proof) -- removed recipient.address
       it("unshields partial balance correctly", async () => {
-          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), ethers.toUtf8Bytes(VAULT_PROOF));
-          await vault.connect(owner).unshield(await token.getAddress(), ethers.parseUnits("40", 6), ethers.toUtf8Bytes(VAULT_PROOF));
+          await vault.connect(owner).shield(await token.getAddress(), ethers.parseUnits("100", 6), proofBytes);
+          await vault.connect(owner).unshield(await token.getAddress(), ethers.parseUnits("40", 6), proofBytes);
           expect(await vault.getShieldedBalance(await token.getAddress())).to.equal(ethers.parseUnits("60", 6));
       });
   });
