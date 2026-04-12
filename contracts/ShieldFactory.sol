@@ -19,7 +19,7 @@ contract ShieldFactory is Ownable, Pausable {
     }
 
     function createVault(bytes32 passwordHash) external whenNotPaused returns (address vault) {
-        require(vaults[msg.sender] == address(0), "Qrypt-Safe already exists for this wallet");
+        require(vaults[msg.sender] == address(0), "QRYPTANK already exists for this wallet");
 
         vault = vaultImplementation.clone();
         PersonalVault(vault).initialize(msg.sender, passwordHash);

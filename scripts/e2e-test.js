@@ -135,15 +135,15 @@ async function main() {
 
   const factory = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, signerA);
 
-  // ── TEST 1: Create Qrypt-Safe ─────────────────────────────────────────────────
-  log("\n[TEST 1] Create Qrypt-Safe");
+  // ── TEST 1: Create QRYPTANK ─────────────────────────────────────────────────
+  log("\n[TEST 1] Create QRYPTANK");
   let vaultAddress;
   try {
     const alreadyHas = await factory.hasVault(signerA.address);
     if (alreadyHas) {
       vaultAddress = await factory.getVault(signerA.address);
       log(`    Vault already exists: ${vaultAddress}`);
-      pass("Create Qrypt-Safe (already deployed)");
+      pass("Create QRYPTANK (already deployed)");
     } else {
       const passwordHash = ethers.keccak256(ethers.toUtf8Bytes(VAULT_PROOF));
       const tx = await factory.createVault(passwordHash);
@@ -151,10 +151,10 @@ async function main() {
       vaultAddress = await factory.getVault(signerA.address);
       log(`    Vault deployed: ${vaultAddress}`);
       log(`    Tx: ${receipt.hash}`);
-      pass("Create Qrypt-Safe");
+      pass("Create QRYPTANK");
     }
   } catch (err) {
-    fail("Create Qrypt-Safe", err.message);
+    fail("Create QRYPTANK", err.message);
     process.exit(1);
   }
 

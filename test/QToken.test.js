@@ -43,7 +43,7 @@ describe("ShieldToken (qToken)", function () {
     it("reverts if non-vault tries to mint", async function () {
       await expect(
         qToken.connect(user).mint(user.address, 1000n)
-      ).to.be.revertedWith("Only Qrypt-Safe can call this");
+      ).to.be.revertedWith("Only QRYPTANK can call this");
     });
 
     it("updates total supply on mint", async function () {
@@ -65,7 +65,7 @@ describe("ShieldToken (qToken)", function () {
     it("reverts if non-vault tries to burn", async function () {
       await expect(
         qToken.connect(user).burn(user.address, 400n)
-      ).to.be.revertedWith("Only Qrypt-Safe can call this");
+      ).to.be.revertedWith("Only QRYPTANK can call this");
     });
 
     it("reverts if burn exceeds balance", async function () {

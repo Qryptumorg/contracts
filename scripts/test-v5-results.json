@@ -1,0 +1,336 @@
+{
+  "ts": "2026-04-10T11:41:21.563Z",
+  "tests": [
+    {
+      "n": 1,
+      "title": "Factory v5 has on-chain bytecode",
+      "pass": true,
+      "desc": "Factory 0x291295B88fC35dcA3208f7cCC3DFc1a2921167E8 bytecode: 802 bytes.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 2,
+      "title": "Impl v5 has on-chain bytecode",
+      "pass": true,
+      "desc": "Implementation 0x92956109d96845f6FeA51F1042B26709756C7F31 bytecode: 11157 bytes.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 3,
+      "title": "Create Vault A (Wallet A) via factory",
+      "pass": true,
+      "desc": "Vault A at 0x3F8Ea229bfB8fE70d2bB524431bbCD09F2018F26 — EIP-1167 clone, created from factory.",
+      "note": "REUSED",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 4,
+      "title": "Create Vault B (Wallet B) via factory",
+      "pass": true,
+      "desc": "Vault B at 0xdeFB7480c6f106Cb8E06F62f9Ac03DAa3EB4a035 — separate EIP-1167 clone, isolated storage.",
+      "note": "REUSED",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 5,
+      "title": "Approve USDC for Vault A (15 USDC)",
+      "pass": true,
+      "desc": "Wallet A approved Vault A to spend 15 USDC via ERC-20 approve().",
+      "note": "",
+      "tx": "0x8fcd3ca939d81f14dd0ab839434bcb7c12ab9de9e4f50f13f35c9413014b7b7a",
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 6,
+      "title": "shield() 10 USDC — correct proof",
+      "pass": true,
+      "desc": "Vault A already has 10.0 qUSDC. Shield from previous run confirmed.",
+      "note": "REUSED",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 7,
+      "title": "shield() with wrong proof — revert expected",
+      "pass": true,
+      "desc": "shield() with incorrect proofHash reverts 'Invalid vault proof'. Raw password never exposed on-chain.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 8,
+      "title": "shield() from non-owner Wallet B — revert expected",
+      "pass": true,
+      "desc": "Wallet B cannot call Vault A. Reverts 'Not vault owner'. onlyOwner strictly enforced.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 9,
+      "title": "shield() amount below 1e6 minimum — revert expected",
+      "pass": true,
+      "desc": "Amounts < MINIMUM_SHIELD_AMOUNT (1e6) revert 'Amount below minimum'. Prevents dust attacks.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 10,
+      "title": "commitTransfer() — hash intent to send 5 USDC to Wallet B",
+      "pass": true,
+      "desc": "commitHash = keccak256(abi.encodePacked(proofHash, nonce, token, to, amount)). Two-layer hash: password never in calldata.",
+      "note": "",
+      "tx": "0x7929d305da656efc0fba7810b8aeacc206e526ed4d3aa365182df3af8fd2c2bd",
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 11,
+      "title": "revealTransfer() with non-existent commit — revert expected",
+      "pass": true,
+      "desc": "Reveal with no matching commit reverts 'Commit not found'. Prevents replay-without-commit attacks.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 12,
+      "title": "revealTransfer() with wrong proof — revert expected",
+      "pass": true,
+      "desc": "Wrong proofHash in revealTransfer reverts 'Invalid vault proof'. Password protected at reveal phase.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 13,
+      "title": "revealTransfer() — 5 USDC from Vault A to Wallet B",
+      "pass": true,
+      "desc": "5 USDC transferred. Wallet B: 5.0 USDC. Vault A remaining: 5.0 qUSDC. Event TransferExecuted emitted.",
+      "note": "",
+      "tx": "0x61ded5f2dbaecee5ef73e2b3d4b6691336ecc4c097de57aea7f444e151f1929a",
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 14,
+      "title": "Replay used/non-existent commitHash — revert expected",
+      "pass": true,
+      "desc": "Re-using a consumed nonce or non-existent commit reverts. Replay attack prevention confirmed.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 15,
+      "title": "changeVaultProof() — rotate to new password hash",
+      "pass": true,
+      "desc": "Vault proof rotated PROOF1 → PROOF2. Both params bytes32 hashes. Event VaultProofChanged. Raw passwords never on-chain.",
+      "note": "",
+      "tx": "0x8d959174cd9ada4b2014ab9bacc0524f1ab485e30c91f8af32aa283344ff4ffa",
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 16,
+      "title": "shield() with OLD proof after changeVaultProof — revert expected",
+      "pass": true,
+      "desc": "Old PROOF1 rejected after rotation. Reverts 'Invalid vault proof'. Key rotation enforced.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 17,
+      "title": "shield() 3 USDC with NEW proof after changeVaultProof — success",
+      "pass": true,
+      "desc": "New proof PROOF2 accepted. 3 USDC shielded. Vault A qUSDC: 8.0.",
+      "note": "",
+      "tx": "0x450ce4d3723420ade77e7fa57f1cf25fefa9cd7ba98d0be1a240a14d4e60f892",
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 18,
+      "title": "unshield() 2 USDC back to Wallet A — success",
+      "pass": true,
+      "desc": "Vault burns 2 qUSDC → transfers 2 USDC to Wallet A. Wallet A: 9.0 USDC. Event TokenUnshielded.",
+      "note": "",
+      "tx": "0xc3565c4b7551dee79521efc8e1bab161c1530653e03f5d6378c03a30cd8d6961",
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 19,
+      "title": "unshield() over shielded balance — revert expected",
+      "pass": true,
+      "desc": "Requesting more than balance reverts 'Insufficient shielded balance'. Over-withdrawal protected.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 20,
+      "title": "Create EIP-712 QryptAir voucher — Wallet A signs offline",
+      "pass": true,
+      "desc": "Wallet A signs Voucher struct off-chain. transferCodeHash = keccak256(transferCode). Raw transferCode never enters calldata. Local ECDSA verify: signer matches Wallet A.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 21,
+      "title": "redeemAirVoucher() — Wallet B redeems 2 USDC voucher",
+      "pass": true,
+      "desc": "Wallet B calls redeemAirVoucher (anyone with valid sig can redeem). 2 USDC delivered. Wallet B USDC: 7.0. Vault: 4.0 qUSDC. Event AirVoucherRedeemed.",
+      "note": "",
+      "tx": "0x6d9df43fd4f63179b262d186e837ce7bae026e092a8928a08b75afea3f5b660a",
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 22,
+      "title": "redeemAirVoucher() replay same nonce — revert expected",
+      "pass": true,
+      "desc": "Re-using a redeemed voucher nonce reverts 'Voucher already redeemed'. One-time-use nonces enforced.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 23,
+      "title": "redeemAirVoucher() expired deadline — revert expected",
+      "pass": true,
+      "desc": "Deadline in the past reverts 'Voucher expired'. Time-bound protection working.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 24,
+      "title": "redeemAirVoucher() signature over wrong transferCodeHash — revert expected",
+      "pass": true,
+      "desc": "Sig signed over wrong hash. ECDSA.recover returns wrong address. Reverts 'Sig not from vault owner'. Voucher integrity enforced.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 25,
+      "title": "redeemAirVoucher() signed by non-vault-owner — revert expected",
+      "pass": true,
+      "desc": "Sig from Wallet B (not Vault A owner) reverts 'Sig not from vault owner'. ECDSA checks vault.owner.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 26,
+      "title": "unshieldToRailgun() with wrong proof — revert expected",
+      "pass": true,
+      "desc": "Wrong proofHash reverts 'Invalid vault proof'. Password protection on QryptShield atomic function.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 27,
+      "title": "unshieldToRailgun() with zero railgunProxy — revert expected",
+      "pass": true,
+      "desc": "Zero address as Railgun proxy reverts 'Invalid Railgun proxy'. Prevents accidental ETH/token burn.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 28,
+      "title": "unshieldToRailgun() amount over shielded balance — revert expected",
+      "pass": true,
+      "desc": "Over-balance amount reverts 'Insufficient shielded balance'. CEI: checks before burn.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 29,
+      "title": "unshieldToRailgun() contract logic — mock Railgun proxy",
+      "pass": true,
+      "desc": "1 qUSDC burned, USDC approve granted+revoked atomically, Railgun proxy called (mock EOA). Contract logic verified. Full ZK integration requires Railgun SDK: UI/SDK test only.",
+      "note": "MOCK PROXY",
+      "tx": "0xc0484dc3d2d8dac9b32d4e8993c3d8b528fd491e1354e60d3c8d456a6c155721",
+      "tx2": null,
+      "revertOnly": false
+    },
+    {
+      "n": 30,
+      "title": "Re-initialize already-initialized vault — revert expected",
+      "pass": true,
+      "desc": "initialize() on existing vault reverts 'Already initialized'. notInitialized modifier working.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 31,
+      "title": "emergencyWithdraw() before 1,296,000-block timelock — revert expected",
+      "pass": true,
+      "desc": "Emergency withdraw available at block 11925868, current block 10629868. Blocks remaining: 1296000. ~180 day timelock active.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    },
+    {
+      "n": 32,
+      "title": "Any vault function from non-owner — revert expected",
+      "pass": true,
+      "desc": "Wallet B cannot call Vault A's onlyOwner functions. Reverts 'Not vault owner'. Access control confirmed.",
+      "note": "",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true
+    }
+  ],
+  "walletA": "0x7ee5dc8845cF2C5626bC8B5C7ea269fe221FEa6b",
+  "walletB": "0x2541eED685B7677e721A185d8612fA792468577d",
+  "factoryV5": "0x291295B88fC35dcA3208f7cCC3DFc1a2921167E8",
+  "implV5": "0x92956109d96845f6FeA51F1042B26709756C7F31",
+  "usdc": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+  "vaultA": "0x3F8Ea229bfB8fE70d2bB524431bbCD09F2018F26",
+  "vaultB": "0xdeFB7480c6f106Cb8E06F62f9Ac03DAa3EB4a035",
+  "qUSDC": "0xB3F201114B239915B3c07ffD65EE81CfAee68316",
+  "passed": 32,
+  "failed": 0,
+  "allPass": true
+}

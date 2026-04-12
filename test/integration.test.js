@@ -52,7 +52,7 @@ describe("Integration: Full Shield/Transfer/Unshield Flow", function () {
     await usdt.connect(bob).approve(vaultBAddr, ethers.MaxUint256);
   });
 
-  it("alice and bob have separate Qrypt-Safe addresses", async function () {
+  it("alice and bob have separate QRYPTANK addresses", async function () {
     expect(await factory.getVault(alice.address)).to.not.equal(await factory.getVault(bob.address));
   });
 
@@ -113,7 +113,7 @@ describe("Integration: Full Shield/Transfer/Unshield Flow", function () {
     ).to.be.revertedWith("Cannot transfer to yourself");
   });
 
-  it("bob can shield his received USDT into his own Qrypt-Safe", async function () {
+  it("bob can shield his received USDT into his own QRYPTANK", async function () {
     const usdtAddr = await usdt.getAddress();
     await vaultB.connect(bob).shield(usdtAddr, SHIELD_AMOUNT, bobProof);
 

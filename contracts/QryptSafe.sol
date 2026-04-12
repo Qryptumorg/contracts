@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+// Qryptum Protocol -- https://qryptum.org
+pragma solidity 0.8.34;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./PersonalQryptSafe.sol";
@@ -7,6 +8,7 @@ import "./PersonalQryptSafe.sol";
 contract QryptSafe {
     using Clones for address;
 
+    bytes32 private constant _QRYPTUM_ID = keccak256("qryptum.protocol.mainnet");
     address public immutable vaultImplementation;
     mapping(address => address) private vaults;
 
@@ -16,11 +18,13 @@ contract QryptSafe {
         vaultImplementation = address(new PersonalQryptSafe());
     }
 
-    function createVault(bytes32 passwordHash) external returns (address vault) {
+    // initialChainHead = H100 of OTP chain, computed by frontend from vault proof
+    function createVault(bytes32 initialChainHead) external returns (address vault) {
         require(vaults[msg.sender] == address(0), "Qrypt-Safe already exists for this wallet");
+        require(initialChainHead != bytes32(0), "Invalid chain head");
 
         vault = vaultImplementation.clone();
-        PersonalQryptSafe(vault).initialize(msg.sender, passwordHash);
+        PersonalQryptSafe(vault).initialize(msg.sender, initialChainHead);
         vaults[msg.sender] = vault;
 
         emit VaultCreated(msg.sender, vault);

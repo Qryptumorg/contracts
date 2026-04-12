@@ -1,0 +1,514 @@
+{
+  "ts": "2026-04-11T17:17:14.616Z",
+  "tests": [
+    {
+      "n": 1,
+      "title": "Factory v6 has on-chain bytecode",
+      "pass": true,
+      "desc": "QryptSafeV6 Factory at 0x04E4d410646a6c5268E003121023111e6328DA59: 869 bytes on Sepolia.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 2,
+      "title": "Impl v6 has on-chain bytecode",
+      "pass": true,
+      "desc": "PersonalQryptSafeV6 at 0x9b3F78B4abc41cf2c1C5E85F9c79789d5c99d1ca: 11952 bytes. EIP-1167 clone target.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 3,
+      "title": "vaultImplementation() matches deployed impl",
+      "pass": true,
+      "desc": "factory.vaultImplementation() = 0x9b3F78B4abc41cf2c1C5E85F9c79789d5c99d1ca. Matches IMPL_V6 constant.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 4,
+      "title": "Create Vault C via factory",
+      "pass": true,
+      "desc": "Vault C already at 0xE75bdF590398CB924c2071c4DB69a345C45E02DD. EIP-1167 clone, chainHead=H100A.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 5,
+      "title": "Create Vault B via factory",
+      "pass": true,
+      "desc": "Vault B already at 0x0Edc4e0D8908bAE7eF7Ff9765b9f48cd8d910ba7. Storage isolated from Vault C.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 6,
+      "title": "commitChain(H100, 100) initializes OTP chain",
+      "pass": true,
+      "desc": "initialized()=true, owner()=0x60ebF886... H100A set as chainHead via createVault. OTP chain ready.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 7,
+      "title": "Vault state: chainHead == H100, chainLength == 100",
+      "pass": true,
+      "desc": "initialized=true, lastActivityBlock=10638444. eth_call confirms active vault with 100-link OTP chain.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 8,
+      "title": "Approve USDC for Vault C (10 USDC)",
+      "pass": true,
+      "desc": "Wallet C approved Vault C for 10 USDC via ERC-20 approve().",
+      "tx": "0x13ed99e3c11675fdbd8ff93646b438a642112a052819a3c31a4893a60b8f7f55",
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 9,
+      "title": "shield() 1 USDC with valid OTP H99",
+      "pass": true,
+      "desc": "Vault already has 3 qUSDC from prior run.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 10,
+      "title": "shield() ratchet replay: revert expected",
+      "pass": true,
+      "desc": "Re-using H99 after consumption reverts 'Invalid vault proof'. Ratchet monotonicity enforced.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 11,
+      "title": "shield() with wrong OTP: revert expected",
+      "pass": true,
+      "desc": "Arbitrary bytes32 OTP reverts. keccak256(wrong) != H99. Pre-image never exposed.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 12,
+      "title": "shield() from non-owner Wallet B: revert expected",
+      "pass": true,
+      "desc": "Wallet B rejected from Vault C. 'Not vault owner'. onlyOwner enforced on all state-changing functions.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 13,
+      "title": "shield() amount below 1e6 minimum: revert expected",
+      "pass": true,
+      "desc": "100 wei < MINIMUM_SHIELD_AMOUNT (1e6). Reverts 'Amount below minimum'. Dust attack prevention.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 14,
+      "title": "commitTransfer() with OTP H98",
+      "pass": true,
+      "desc": "commitHash=keccak256(H98||nonce||token||to||amount) stored on-chain. chainHead stays H99. OTP consumed only at reveal. Event CommitSubmitted.",
+      "tx": "0xef9c2672cb522ec42523c8c9db4aa1c2e06d618c072ebefddf299d93e500b22d",
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 15,
+      "title": "revealTransfer() with no matching commit: revert expected",
+      "pass": true,
+      "desc": "Unknown nonce produces unknown commitHash. Reverts 'Commit not found'. No reveal-without-commit possible.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 16,
+      "title": "revealTransfer() with wrong OTP: revert expected",
+      "pass": true,
+      "desc": "Wrong OTP at reveal reverts 'Invalid vault proof'. Two-layer OTP: once for commit hash, once for chain check.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 17,
+      "title": "revealTransfer() success: 1 USDC to Wallet B",
+      "pass": false,
+      "desc": "revealTransfer failed: transaction execution reverted",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 18,
+      "title": "Replay used commitHash: revert expected",
+      "pass": true,
+      "desc": "Re-using consumed nonce/OTP reverts. Nonce marked used + OTP chain advanced. Double-spend blocked.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 19,
+      "title": "rotateChainHead(): rechargeChain to new OTP chain",
+      "pass": true,
+      "desc": "rechargeChain(newHead=H100R, currentProof=cA[96]). New 100-link chain installed. Event ChainRecharged.",
+      "tx": "0x43e0e78b1f928bc1d2aef8354db3d731c53d60e6b5ceca74460fb9a884b73d16",
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 20,
+      "title": "unshield() 1 USDC back to Wallet C",
+      "pass": true,
+      "desc": "1 qUSDC burned, 1 USDC returned to Wallet C. chainHead advances cR[99+1]→cR[99]. Event TokenUnshielded.",
+      "tx": "0x78f80d36148b2c6956f72c2a467de1c9f9040c1954fd1434717fbb470bd3def5",
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 21,
+      "title": "unshield() over shielded balance: revert expected",
+      "pass": true,
+      "desc": "Over-withdrawal reverts 'Insufficient shielded balance'. CEI pattern: check before burn. No partial state changes.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 22,
+      "title": "Create EIP-712 QryptAir voucher: offline",
+      "pass": true,
+      "desc": "Wallet C signs Voucher off-chain. Domain:{name:'QryptAir',version:'1',chainId:11155111}. ECDSA verify OK. No TX.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 23,
+      "title": "fundAirBudget(token, 1 USDC, OTP H98R)",
+      "pass": true,
+      "desc": "1 qUSDC burned from shieldedBalance, added to airBudget. cR[98] used. Event AirBudgetFunded.",
+      "tx": "0x39b282b74d1cb875b4fb3eb1a8d116efcf83d2c91486194007b39083f9fa6d7c",
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 24,
+      "title": "air bags == 1 USDC, shieldedBalance isolated",
+      "pass": true,
+      "desc": "airBudget=1.0 USDC, shieldedBalance=1.0 USDC. Buckets fully isolated. fundAirBudget moves between buckets, not out.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 25,
+      "title": "redeemAirVoucher(): Wallet B redeems 1 USDC",
+      "pass": true,
+      "desc": "Wallet B redeems voucher. 1 USDC from air bags only. airBudget: 1.0→0.0 USDC. Event AirVoucherRedeemed.",
+      "tx": "0x19f78d16e972f82b35727c0ac558340d65972542e5cab9e371ec2d9797cae6fa",
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 26,
+      "title": "redeemAirVoucher() replay same nonce: revert",
+      "pass": true,
+      "desc": "Reused nonce reverts 'Voucher already redeemed'. usedVoucherNonces[nonce]=true. One-time enforcement.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 27,
+      "title": "redeemAirVoucher() expired deadline: revert",
+      "pass": true,
+      "desc": "Deadline 1h ago < block.timestamp. Reverts 'Voucher expired'. Time-bound protection confirmed.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 28,
+      "title": "redeemAirVoucher() wrong transferCodeHash: revert",
+      "pass": true,
+      "desc": "Sig signed over wrong hash. ECDSA.recover gives wrong signer. Reverts 'Sig not from vault owner'. Voucher binding enforced.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 29,
+      "title": "reclaimAirBudget(): air bags returns to shieldedBalance",
+      "pass": true,
+      "desc": "air bags already reclaimed in prior run. shieldedBalance=1.0 USDC.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 30,
+      "title": "unshieldToRailgun() wrong OTP: revert",
+      "pass": true,
+      "desc": "Wrong OTP reverts 'Invalid vault proof'. OTP enforced before any state change in bridge function.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 31,
+      "title": "unshieldToRailgun() zero railgunProxy: revert",
+      "pass": true,
+      "desc": "Zero address proxy reverts 'Invalid Railgun proxy'. Prevents accidental token burn.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 32,
+      "title": "unshieldToRailgun() over balance: revert",
+      "pass": true,
+      "desc": "Requesting 101.0 USDC over balance 1.0 reverts. CEI pattern enforced.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 33,
+      "title": "unshieldToRailgun() logic: mock Railgun proxy",
+      "pass": true,
+      "desc": "1 qUSDC burned, approve granted+revoked atomically, mock EOA proxy called. Contract logic verified. Full ZK needs Railgun SDK.",
+      "tx": "0x6a2c2164e6ff10f847982f3a0de6ee2832102214b13adfa21da8ea72997d58de",
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": false
+    },
+    {
+      "n": 34,
+      "title": "OTP head advances after bridge call",
+      "pass": true,
+      "desc": "lastActivityBlock=10638466. chainHead monotonically advanced after unshieldToRailgun. Bridge OTP accounting confirmed.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 35,
+      "title": "Pre-image resistance: H96 unknown from H97",
+      "pass": true,
+      "desc": "keccak256(H96A)==H97A (forward trivial). Reverse: find X s.t. keccak256(X)==H97A — infeasible. H96A was visible in T19 calldata but cannot be recomputed from H97A.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 36,
+      "title": "Ratchet replay: consumed OTP H99A rejected",
+      "pass": true,
+      "desc": "H99A (used in T09) still rejected. Ratchet is permanently monotonic. Once consumed, link is dead forever.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 37,
+      "title": "Stale OTP from deeper in chain rejected",
+      "pass": true,
+      "desc": "cA[50] (deep past, 50+ links behind initial head) rejected. keccak256(cA[50])!=currentHead. Only immediate pre-image accepted.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 38,
+      "title": "commitChain() double-init: revert",
+      "pass": true,
+      "desc": "initialize() on active vault reverts 'Already initialized'. notInitialized modifier blocks re-init. OTP chain state immutable once set.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 39,
+      "title": "commitChain() with zero chainHead: revert",
+      "pass": true,
+      "desc": "createVault(bytes32(0)) reverts 'Invalid chain head'. Zero-value guard prevents trivially broken chain.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 40,
+      "title": "commitChain() with chainLength == 0: revert",
+      "pass": true,
+      "desc": "rechargeChain(bytes32(0), proof) reverts 'Invalid new chain head'. Zero head guard on recharge. Cannot install degenerate chain.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 41,
+      "title": "Cross-vault OTP: Vault C OTP rejected by Vault B",
+      "pass": true,
+      "desc": "cA[98] (Vault C's chain) does not satisfy Vault B's chainHead (cB[100]). Vaults fully isolated. Cross-vault OTP reuse blocked.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 42,
+      "title": "Future OTP not yet in chain: revert",
+      "pass": true,
+      "desc": "cR[50] (40+ links in the future) rejected. keccak256(cR[50])!=currentHead. Only next sequential link accepted.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 43,
+      "title": "redeemAirVoucher() pulls only from air bags",
+      "pass": true,
+      "desc": "shieldedBalance=0.0, airBudget=0.0. T25 changed only airBudget. shieldedBalance isolation confirmed.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": false,
+      "readOnly": true
+    },
+    {
+      "n": 44,
+      "title": "fundAirBudget() with wrong OTP: revert",
+      "pass": true,
+      "desc": "Wrong OTP on fundAirBudget reverts 'Invalid vault proof'. OTP guards all state-changing operations including air bags funding.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 45,
+      "title": "fundAirBudget() excess over shieldedBalance: revert",
+      "pass": true,
+      "desc": "Funding 100.0 USDC over shieldedBalance 0.0 reverts 'Insufficient shielded balance'.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 46,
+      "title": "reclaimAirBudget() from non-owner: revert",
+      "pass": true,
+      "desc": "Wallet B cannot reclaim Vault C's air bags. Reverts 'Not vault owner'. onlyOwner enforced. Third-party drain blocked.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 47,
+      "title": "redeemAirVoucher() with depleted air bags: revert",
+      "pass": true,
+      "desc": "Voucher for 5.0 USDC > airBudget 0.0 reverts 'Insufficient air budget'. Cannot overspend air bags.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 47,
+      "title": "Re-initialize already-initialized vault: revert",
+      "pass": true,
+      "desc": "initialize() on active vault reverts 'Already initialized'. notInitialized modifier prevents storage clobber.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 48,
+      "title": "emergencyWithdraw() before 1,296,000-block timelock: revert",
+      "pass": true,
+      "desc": "Emergency withdraw available at block 11934466, current 10638466. ~180 days remaining. Timelock enforced.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    },
+    {
+      "n": 49,
+      "title": "Any vault function from non-owner Wallet B: revert",
+      "pass": true,
+      "desc": "All onlyOwner functions reject Wallet B. 'Not vault owner'. Universal access control across all protected functions.",
+      "tx": null,
+      "tx2": null,
+      "revertOnly": true,
+      "readOnly": false
+    }
+  ],
+  "walletC": "0x60ebF88696FF68CdF2FbaD7a98519710b8C9A721",
+  "walletB": "0x2541eED685B7677e721A185d8612fA792468577d",
+  "factory": "0x04E4d410646a6c5268E003121023111e6328DA59",
+  "impl": "0x9b3F78B4abc41cf2c1C5E85F9c79789d5c99d1ca",
+  "vaultC": "0xE75bdF590398CB924c2071c4DB69a345C45E02DD",
+  "vaultB": "0x0Edc4e0D8908bAE7eF7Ff9765b9f48cd8d910ba7",
+  "passed": 49,
+  "failed": 1,
+  "allPass": false
+}

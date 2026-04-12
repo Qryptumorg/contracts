@@ -8,7 +8,7 @@ contract ShieldToken is ERC20 {
     uint8 private _decimals;
 
     modifier onlyVault() {
-        require(msg.sender == vault, "Only Qrypt-Safe can call this");
+        require(msg.sender == vault, "Only QRYPTANK can call this");
         _;
     }
 

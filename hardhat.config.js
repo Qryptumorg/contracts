@@ -26,7 +26,7 @@ module.exports = {
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     },
     mainnet: {
-      url: process.env.ALCHEMY_MAINNET_URL || "",
+      url: process.env.ALCHEMY_MAINNET_URL || process.env.MAINNET_RPC_URL || "https://ethereum-rpc.publicnode.com",
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
     },
   },
