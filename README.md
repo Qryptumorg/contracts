@@ -1,8 +1,8 @@
 # Qryptum Contracts
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-white.svg)](LICENSE)
 [![Solidity](https://img.shields.io/badge/Solidity-0.8.34-blue.svg)](https://soliditylang.org)
-[![Tests](https://img.shields.io/badge/Tests-133%20passing-brightgreen.svg)](test/)
+[![Tests](https://img.shields.io/badge/Tests-169%20passing-brightgreen.svg)](test/)
 [![Network](https://img.shields.io/badge/Network-Sepolia-orange.svg)](https://sepolia.etherscan.io)
 
 Solidity smart contracts for the Qryptum protocol. Non-custodial ERC-20 privacy vaults on Ethereum L1 with three transfer modes: QryptSafe (OTP chain), QryptShield (ZK pool), and QryptAir (offline voucher).
@@ -32,20 +32,27 @@ Owner signs an EIP-712 typed-data voucher offline. Recipient redeems it on-chain
 | `PersonalQryptSafeV6` | Vault: OTP chain proof, rechargeChain, air bags isolation |
 | `MockERC20` | Test token for local development |
 
-### V5
+### V3
 
 | Contract | Description |
 |---|---|
-| `QryptSafe` (V5 factory) | Factory using EIP-1167 clone pattern |
-| `PersonalQryptSafeV5` | Vault: bytes32 proofHash, QryptAir EIP-712, QryptShield |
+| `QryptSafeV3` | Factory: EIP-1167 clone, no Ownable, MINIMUM_SHIELD_AMOUNT constant |
+| `PersonalQryptSafeV3` | Vault: changeVaultProof(), metaTransfer() EIP-712, zero admin keys |
 
-### V2 to V4 (Historical)
+### V2
 
 | Contract | Description |
 |---|---|
-| `ShieldFactory` | V2 factory with Ownable and Pausable |
-| `PersonalVault` | V2 vault using string vault proofs |
+| `QryptSafeV2` | Factory: EIP-1167 clone, Ownable, setMinShieldAmount() |
+| `PersonalQryptSafeV2` | Vault: commit-reveal, SafeERC20, nonce deduplication |
 | `ShieldToken` | Non-transferable qToken (all versions) |
+
+### V1
+
+| Contract | Description |
+|---|---|
+| `ShieldFactory` | Genesis factory: Ownable + Pausable, deploys PersonalVault clones |
+| `PersonalVault` | Genesis vault: string vault proofs, basic commit-reveal |
 
 ---
 
@@ -59,35 +66,53 @@ Owner signs an EIP-712 typed-data voucher offline. Recipient redeems it on-chain
 | PersonalQryptSafeV6 impl | `0x9b3F78B4abc41cf2c1C5E85F9c79789d5c99d1ca` |
 | qUSDC (6 decimals) | `0x71f6fC3c252250F7602639B0D5458f8D682115d4` |
 
-### V5 (Historical)
+### V3 (Superseded)
 
-Deployed and verified on Sepolia via `scripts/deploy-verify-v5.js`. Superseded by V6.
-
-### V2 (Historical)
+Deployed and MIT-verified on Sepolia. Superseded by V4+.
 
 | Contract | Address |
 |---|---|
-| ShieldFactory v2 | `0x0c060e880A405B1231Ce1263c6a52a272cC1cE05` |
-| PersonalVault impl | `0x5A77630B5D49943f71785BC57aF37380bBea0c5e` |
-| qUSDC (6 decimals) | `0xcD1569A66F01023a8587D69F3D3ad9C4DA12c3Cf` |
+| QryptSafeV3 factory | [`0x88E8eAFafc99E83e687BCAbD53F783a92e51F75c`](https://sepolia.etherscan.io/address/0x88E8eAFafc99E83e687BCAbD53F783a92e51F75c) |
+| PersonalQryptSafeV3 impl | [`0xaf2E91CDc70e81fA74b9aE9C322e8302bb51715e`](https://sepolia.etherscan.io/address/0xaf2E91CDc70e81fA74b9aE9C322e8302bb51715e) |
+| VaultA (test clone) | [`0xA4f55574a666919cab62b23A11923f999dB1384a`](https://sepolia.etherscan.io/address/0xA4f55574a666919cab62b23A11923f999dB1384a) |
+| qUSDC (6 decimals) | [`0xba89d6e805Af537aA61BA4437A0C781CD17B5637`](https://sepolia.etherscan.io/address/0xba89d6e805Af537aA61BA4437A0C781CD17B5637) |
+
+### V2 (Historical)
+
+Deployed and MIT-verified on Sepolia. Superseded by V3+.
+
+| Contract | Address |
+|---|---|
+| QryptSafeV2 factory | [`0x26BAb8B6e88201ad4824ea1290a7C9c7b9B10fCf`](https://sepolia.etherscan.io/address/0x26BAb8B6e88201ad4824ea1290a7C9c7b9B10fCf) |
+| PersonalQryptSafeV2 impl | [`0x675f70646713D4026612c673E644C61ae3aa7725`](https://sepolia.etherscan.io/address/0x675f70646713D4026612c673E644C61ae3aa7725) |
+
+### V1 (Historical)
+
+Deployed and MIT-verified on Sepolia. Superseded by V2+.
+
+| Contract | Address |
+|---|---|
+| ShieldFactory v1 | [`0xd05F4fb3f24C7bF0cb482123186CF797E42CF17A`](https://sepolia.etherscan.io/address/0xd05F4fb3f24C7bF0cb482123186CF797E42CF17A) |
+| PersonalVault v1 impl | [`0x5E398e1E0Ba28f9659013B1212f24b8B43d69393`](https://sepolia.etherscan.io/address/0x5E398e1E0Ba28f9659013B1212f24b8B43d69393) |
 
 ---
 
 ## Tests
 
-133 tests passing across all contract suites.
+169 tests passing across all contract suites.
 
 | Suite | Tests | Description |
 |---|---|---|
 | `QryptSafeV6.test.js` | 49 | OTP sequential proofs, replay prevention, recharge, air bags, emergency withdraw |
+| `QryptSafeV3.test.js` | 36 | Trustless factory, changeVaultProof, metaTransfer EIP-712, zero admin keys |
 | `ShieldFactory.test.js` | 28 | V2 factory deploy, pause, clone integrity |
 | `PersonalVault.test.js` | 46 | V2 vault shield, commit, reveal, expiry |
 | `QToken.test.js` | 7 | Non-transferable qToken behavior |
 | `integration.test.js` | 3 | Full shield, transfer, unshield flow |
 
 ```bash
-npm install
-npx hardhat test
+pnpm install
+pnpm hardhat test
 ```
 
 ---
@@ -95,7 +120,7 @@ npx hardhat test
 ## Compile
 
 ```bash
-npx hardhat compile
+pnpm hardhat compile
 ```
 
 Compiler: Solidity 0.8.34 with `viaIR: true` and optimizer enabled (200 runs).
@@ -104,26 +129,26 @@ Compiler: Solidity 0.8.34 with `viaIR: true` and optimizer enabled (200 runs).
 
 ## Deploy
 
-### Deploy V6 to Sepolia
+### Deploy V3 to Sepolia
 
 ```bash
 cp .env.example .env
 # Fill in PRIVATE_KEY and ETHERSCAN_API_KEY
-npm run deploy:v6
+pnpm run deploy-verify:v3
 ```
 
-Alternatively, deploy and verify in one step:
+### Deploy V6 to Sepolia
 
 ```bash
-npm run deploy-verify:v6
+pnpm run deploy-verify:v6
 ```
 
 ### Historical Scripts
 
 | Script | Purpose |
 |---|---|
+| `scripts/deploy-verify-v3.js` | V3 deploy and Etherscan verify |
 | `scripts/deploy-v4.js` | QryptAir first version |
-| `scripts/deploy-v5.js` | QryptSafeV5 deployment |
 | `scripts/deploy-verify-v5.js` | V5 deploy and Etherscan verify |
 | `scripts/deploy-verify-v6.js` | V6 deploy and Etherscan verify |
 
@@ -131,10 +156,14 @@ npm run deploy-verify:v6
 
 ## Sepolia E2E
 
-Run the 49-scenario live E2E suite against the deployed V6 contracts:
+Run the live E2E suite against deployed contracts:
 
 ```bash
-npm run test:v6:e2e
+# V3 (5 on-chain scenarios)
+pnpm run test:v3:e2e
+
+# V6 (49 scenarios)
+pnpm run test:v6:e2e
 ```
 
 Requires `PRIVATE_KEY` and `SEPOLIA_RPC_URL` in `.env`.
@@ -143,6 +172,5 @@ Requires `PRIVATE_KEY` and `SEPOLIA_RPC_URL` in `.env`.
 
 ## License
 
-MIT License. Copyright (c) 2024-2026 Qryptum.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-white.svg)](LICENSE)
+Copyright (c) 2026 [wei-zuan](https://github.com/wei-zuan). See [LICENSE](LICENSE) for full terms.
