@@ -1,38 +1,63 @@
 // SPDX-License-Identifier: MIT
-// Qryptum Protocol v5.0 -- https://qryptum.org
+/*
+ *
+ *           ███m███████████████████████████m███
+ *           ███                             ███
+ *           ███                             ███
+ * ███████████████████████████████████████████████████████
+ * ███████████████████████████████████████████████████████
+ * ███                                                 ███
+ * ███     ███  ████  █   █ ████  █████ █   █ █   █    ███
+ * ███    █   █ █   █ █   █ █   █   █   █   █ ██ ██    ███
+ * ███    █   █ ████   █ █  ████    █   █   █ █ █ █    ███
+ * ███    █  ██ █ █     █   █       █   █   █ █   █    ███
+ * ███     ██ █ █  █    █   █       █    ███  █   █    ███
+ * ███                                                 ███
+ * ███                      ████                       ███
+ * ███                     ██  ██                      ███
+ * ███                     ██  ██                      ███
+ * ███                      ████                       ███
+ * ███                       ██                        ███
+ * ███                       ██                        ███
+ * ███                                                 ███
+ * ███████████████████████████████████████████████████████
+ * ███████████████████████████████████████████████████████
+ *
+ */
+// https://qryptum.org
 pragma solidity 0.8.34;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "./PersonalQryptSafeV5.sol";
 
-contract QryptSafe {
+contract QryptSafeV5 {
     using Clones for address;
 
-    address public immutable vaultImplementation;
+    address public immutable qryptSafeImpl;
     mapping(address => address) private vaults;
 
-    event VaultCreated(address indexed owner, address indexed vault);
+    event QryptSafeCreated(address indexed owner, address indexed vault);
 
     constructor() {
-        vaultImplementation = address(new PersonalQryptSafe());
+        qryptSafeImpl = address(new PersonalQryptSafeV5());
     }
 
-    // passwordHash = keccak256(password) computed by frontend
-    function createVault(bytes32 passwordHash) external returns (address vault) {
-        require(vaults[msg.sender] == address(0), "Qrypt-Safe already exists for this wallet");
+    // passwordHash = keccak256(password) computed by frontend — raw password never on-chain
+    function createQryptSafe(bytes32 passwordHash) external returns (address vault) {
+        require(vaults[msg.sender] == address(0), "QryptSafe already exists for this wallet");
 
-        vault = vaultImplementation.clone();
-        PersonalQryptSafe(vault).initialize(msg.sender, passwordHash);
+        vault = qryptSafeImpl.clone();
+        PersonalQryptSafeV5(vault).initialize(msg.sender, passwordHash);
         vaults[msg.sender] = vault;
 
-        emit VaultCreated(msg.sender, vault);
+        emit QryptSafeCreated(msg.sender, vault);
     }
 
-    function hasVault(address wallet) external view returns (bool) {
+    function hasQryptSafe(address wallet) external view returns (bool) {
         return vaults[wallet] != address(0);
     }
 
-    function getVault(address wallet) external view returns (address) {
+    function getQryptSafe(address wallet) external view returns (address) {
         return vaults[wallet];
     }
 }

@@ -11,20 +11,20 @@ async function main() {
     console.log("");
     console.log("v5 changes:");
     console.log("  - All password params: string -> bytes32 (hash only, never raw)");
-    console.log("  - New: unshieldToRailgun() for atomic QryptShield");
+    console.log("  - Full function/event rename: qrypt/unqrypt/veilTransfer/unveilTransfer/railgun/rotateProof/claimAirVoucher");
     console.log("  - QryptSafe + QryptAir: same UX, passwords now hashed client-side");
     console.log("");
 
-    const QryptSafe = await ethers.getContractFactory("contracts/QryptSafeV5.sol:QryptSafe");
+    const QryptSafe = await ethers.getContractFactory("contracts/QryptSafeV5.sol:QryptSafeV5");
 
     console.log("Deploying QryptSafe v5 factory (includes PersonalQryptSafe v5 impl)...");
     const factory = await QryptSafe.deploy();
     await factory.waitForDeployment();
 
     const factoryAddress = await factory.getAddress();
-    const implAddress    = await factory.vaultImplementation();
+    const implAddress    = await factory.qryptSafeImpl();
 
-    console.log("QryptSafe v5 factory deployed    :", factoryAddress);
+    console.log("QryptSafe v5 factory deployed      :", factoryAddress);
     console.log("PersonalQryptSafe v5 implementation:", implAddress);
     console.log("");
 

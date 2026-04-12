@@ -1,5 +1,30 @@
 // SPDX-License-Identifier: MIT
-// Qryptum Protocol v5.0 -- https://qryptum.org
+/*
+ *
+ *           ███████████████████████████████████████
+ *           ███                                 ███
+ *           ███                                 ███
+ * ███████████████████████████████████████████████████████
+ * ███████████████████████████████████████████████████████
+ * ███                                                 ███
+ * ███     ███  ████  █   █ ████  █████ █   █ █   █    ███
+ * ███    █   █ █   █ █   █ █   █   █   █   █ ██ ██    ███
+ * ███    █   █ ████   █ █  ████    █   █   █ █ █ █    ███
+ * ███    █  ██ █ █     █   █       █   █   █ █   █    ███
+ * ███     ██ █ █  █    █   █       █    ███  █   █    ███
+ * ███                                                 ███
+ * ███                      ████                       ███
+ * ███                     ██  ██                      ███
+ * ███                     ██  ██                      ███
+ * ███                      ████                       ███
+ * ███                       ██                        ███
+ * ███                       ██                        ███
+ * ███                                                 ███
+ * ███████████████████████████████████████████████████████
+ * ███████████████████████████████████████████████████████
+ *
+ */
+// https://qryptum.org
 pragma solidity 0.8.34;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -8,7 +33,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./ShieldToken.sol";
 
-contract PersonalQryptSafe is ReentrancyGuard {
+contract PersonalQryptSafeV5 is ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
@@ -18,15 +43,15 @@ contract PersonalQryptSafe is ReentrancyGuard {
 
     uint256 public lastActivityBlock;
     uint256 public constant EMERGENCY_DELAY_BLOCKS = 1_296_000;
-    uint256 public constant COMMIT_EXPIRY_SECONDS = 600;
-    uint256 public constant MINIMUM_SHIELD_AMOUNT = 1e6;
+    uint256 public constant VEIL_EXPIRY_SECONDS    = 600;
+    uint256 public constant MINIMUM_SHIELD_AMOUNT  = 1e6;
 
     mapping(address => address) public qTokens;
-    mapping(bytes32 => CommitData) private commits;
+    mapping(bytes32 => VeilData) private veils;
 
     mapping(bytes32 => bool) public usedVoucherNonces;
 
-    struct CommitData {
+    struct VeilData {
         uint256 blockNumber;
         uint256 timestamp;
         bool used;
@@ -41,14 +66,14 @@ contract PersonalQryptSafe is ReentrancyGuard {
         "Voucher(address token,uint256 amount,address recipient,uint256 deadline,bytes32 nonce,bytes32 transferCodeHash)"
     );
 
-    event TokenShielded(address indexed token, uint256 amount, address indexed qToken);
-    event TokenUnshielded(address indexed token, uint256 amount);
-    event TransferExecuted(address indexed token, address indexed to, uint256 amount);
-    event QTokenDeployed(address indexed token, address indexed qToken);
-    event VaultProofChanged();
-    event CommitSubmitted(bytes32 indexed commitHash);
-    event EmergencyWithdraw(address indexed token, uint256 amount);
-    event AirVoucherRedeemed(
+    event TokenQrypted(address indexed token, uint256 amount, address indexed qToken);
+    event TokenUnqrypted(address indexed token, uint256 amount);
+    event TransferUnveiled(address indexed token, address indexed to, uint256 amount);
+    event QTokenCreated(address indexed token, address indexed qToken);
+    event ProofRotated();
+    event TransferVeiled(bytes32 indexed veilHash);
+    event EmergencyExit(address indexed token, uint256 amount);
+    event AirVoucherClaimed(
         bytes32 indexed nonce,
         address indexed token,
         uint256 amount,
@@ -56,7 +81,7 @@ contract PersonalQryptSafe is ReentrancyGuard {
     );
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Not vault owner");
+        require(msg.sender == owner, "Not QryptSafe owner");
         _;
     }
 
@@ -100,13 +125,13 @@ contract PersonalQryptSafe is ReentrancyGuard {
         ShieldToken qToken = new ShieldToken(name, symbol, address(this), underlyingDecimals);
         qTokens[tokenAddress] = address(qToken);
 
-        emit QTokenDeployed(tokenAddress, address(qToken));
+        emit QTokenCreated(tokenAddress, address(qToken));
         return address(qToken);
     }
 
     // ── QryptSafe: deposit tokens into vault ─────────────────────────────
     // proofHash = keccak256(password) computed by frontend — raw password never on-chain
-    function shield(
+    function qrypt(
         address tokenAddress,
         uint256 amount,
         bytes32 proofHash
@@ -122,11 +147,11 @@ contract PersonalQryptSafe is ReentrancyGuard {
         ShieldToken(qTokenAddress).mint(owner, received);
 
         lastActivityBlock = block.number;
-        emit TokenShielded(tokenAddress, received, qTokenAddress);
+        emit TokenQrypted(tokenAddress, received, qTokenAddress);
     }
 
     // ── QryptSafe: withdraw tokens from vault ────────────────────────────
-    function unshield(
+    function unqrypt(
         address tokenAddress,
         uint256 amount,
         bytes32 proofHash
@@ -135,34 +160,36 @@ contract PersonalQryptSafe is ReentrancyGuard {
         require(amount > 0, "Amount must be greater than zero");
 
         address qTokenAddress = qTokens[tokenAddress];
-        require(qTokenAddress != address(0), "Token not shielded");
-        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient shielded balance");
+        require(qTokenAddress != address(0), "Token not qrypted");
+        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient qrypted balance");
 
         ShieldToken(qTokenAddress).burn(owner, amount);
         IERC20(tokenAddress).safeTransfer(owner, amount);
 
         lastActivityBlock = block.number;
-        emit TokenUnshielded(tokenAddress, amount);
+        emit TokenUnqrypted(tokenAddress, amount);
     }
 
-    // ── QryptSafe: commit phase of commit-reveal transfer ────────────────
-    function commitTransfer(bytes32 commitHash) external onlyOwner {
-        require(!commits[commitHash].used, "Commit already used");
-        require(commits[commitHash].blockNumber == 0, "Commit already exists");
+    // ── QryptSafe: veil phase of veil-unveil transfer ─────────────────────
+    // veilHash = keccak256(abi.encodePacked(proofHash, nonce, tokenAddress, to, amount))
+    // proofHash is hashed off-chain — raw password never on-chain
+    function veilTransfer(bytes32 veilHash) external onlyOwner {
+        require(!veils[veilHash].used, "Veil already used");
+        require(veils[veilHash].blockNumber == 0, "Veil already exists");
 
-        commits[commitHash] = CommitData({
+        veils[veilHash] = VeilData({
             blockNumber: block.number,
-            timestamp: block.timestamp,
-            used: false
+            timestamp:   block.timestamp,
+            used:        false
         });
 
         lastActivityBlock = block.number;
-        emit CommitSubmitted(commitHash);
+        emit TransferVeiled(veilHash);
     }
 
-    // ── QryptSafe: reveal phase of commit-reveal transfer ────────────────
-    // commitHash must equal keccak256(abi.encodePacked(proofHash, nonce, tokenAddress, to, amount))
-    function revealTransfer(
+    // ── QryptSafe: unveil phase of veil-unveil transfer ──────────────────
+    // veilHash must equal keccak256(abi.encodePacked(proofHash, nonce, tokenAddress, to, amount))
+    function unveilTransfer(
         address tokenAddress,
         address to,
         uint256 amount,
@@ -174,37 +201,37 @@ contract PersonalQryptSafe is ReentrancyGuard {
         require(to != address(0), "Invalid recipient");
         require(to != msg.sender, "Cannot transfer to yourself");
 
-        bytes32 commitHash = keccak256(abi.encodePacked(proofHash, nonce, tokenAddress, to, amount));
-        CommitData storage commit = commits[commitHash];
-        require(commit.blockNumber != 0, "Commit not found");
-        require(!commit.used, "Commit already used");
-        require(block.number > commit.blockNumber, "Must wait one block after commit");
-        require(block.timestamp <= commit.timestamp + COMMIT_EXPIRY_SECONDS, "Commit expired");
+        bytes32 veilHash = keccak256(abi.encodePacked(proofHash, nonce, tokenAddress, to, amount));
+        VeilData storage veil = veils[veilHash];
+        require(veil.blockNumber != 0, "Veil not found");
+        require(!veil.used, "Veil already used");
+        require(block.number > veil.blockNumber, "Must wait one block after veil");
+        require(block.timestamp <= veil.timestamp + VEIL_EXPIRY_SECONDS, "Veil expired");
 
-        commit.used = true;
+        veil.used = true;
 
         address qTokenAddress = qTokens[tokenAddress];
-        require(qTokenAddress != address(0), "Token not shielded");
-        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient shielded balance");
+        require(qTokenAddress != address(0), "Token not qrypted");
+        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient qrypted balance");
 
         ShieldToken(qTokenAddress).burn(owner, amount);
         IERC20(tokenAddress).safeTransfer(to, amount);
 
         lastActivityBlock = block.number;
-        emit TransferExecuted(tokenAddress, to, amount);
+        emit TransferUnveiled(tokenAddress, to, amount);
     }
 
-    // ── QryptSafe: change vault proof ────────────────────────────────────
-    function changeVaultProof(bytes32 oldHash, bytes32 newHash) external onlyOwner {
+    // ── QryptSafe: rotate vault proof ────────────────────────────────────
+    function rotateProof(bytes32 oldHash, bytes32 newHash) external onlyOwner {
         require(oldHash == passwordHash, "Invalid current vault proof");
         require(newHash != bytes32(0), "Invalid new vault proof");
 
         passwordHash = newHash;
         lastActivityBlock = block.number;
-        emit VaultProofChanged();
+        emit ProofRotated();
     }
 
-    // ── QryptSafe: emergency withdraw after inactivity ───────────────────
+    // ── QryptSafe: emergency exit after inactivity ───────────────────────
     function emergencyWithdraw(address[] calldata tokenAddresses) external onlyOwner nonReentrant {
         require(
             block.number >= lastActivityBlock + EMERGENCY_DELAY_BLOCKS,
@@ -216,15 +243,15 @@ contract PersonalQryptSafe is ReentrancyGuard {
             uint256 balance = IERC20(tokenAddress).balanceOf(address(this));
             if (balance > 0) {
                 IERC20(tokenAddress).safeTransfer(owner, balance);
-                emit EmergencyWithdraw(tokenAddress, balance);
+                emit EmergencyExit(tokenAddress, balance);
             }
         }
     }
 
-    // ── QryptAir: redeem an offline-signed EIP-712 voucher ───────────────
+    // ── QryptAir: claim an offline-signed EIP-712 voucher ────────────────
     // transferCodeHash = keccak256(transferCode) computed by recipient frontend
     // raw transferCode never enters the TX calldata
-    function redeemAirVoucher(
+    function claimAirVoucher(
         address token,
         uint256 amount,
         address recipient,
@@ -263,8 +290,8 @@ contract PersonalQryptSafe is ReentrancyGuard {
         require(signer == owner,      "Sig not from vault owner");
 
         address qTokenAddr = qTokens[token];
-        require(qTokenAddr != address(0),                           "Token not shielded");
-        require(ShieldToken(qTokenAddr).balanceOf(owner) >= amount, "Insufficient shielded balance");
+        require(qTokenAddr != address(0),                           "Token not qrypted");
+        require(ShieldToken(qTokenAddr).balanceOf(owner) >= amount, "Insufficient qrypted balance");
 
         usedVoucherNonces[nonce] = true;
         lastActivityBlock = block.number;
@@ -272,44 +299,40 @@ contract PersonalQryptSafe is ReentrancyGuard {
         ShieldToken(qTokenAddr).burn(owner, amount);
         IERC20(token).safeTransfer(recipient, amount);
 
-        emit AirVoucherRedeemed(nonce, token, amount, recipient);
+        emit AirVoucherClaimed(nonce, token, amount, recipient);
     }
 
-    // ── QryptShield: atomic unshield-to-Railgun ──────────────────────────
+    // ── QryptShield: atomic unqrypt-to-Railgun ───────────────────────────
     // Burns qTokens, approves Railgun, and calls Railgun.shield() in one TX.
-    // shieldCalldata is built off-chain by the frontend via buildShieldTx().
+    // railgunCalldata is built off-chain by the frontend via buildShieldTx().
     // railgunProxy is the address returned by buildShieldTx().to.
     // msg.value is forwarded to Railgun in case the shield call requires ETH.
-    function unshieldToRailgun(
+    function railgun(
         address tokenAddress,
         uint256 amount,
         bytes32 proofHash,
         address railgunProxy,
-        bytes calldata shieldCalldata
+        bytes calldata railgunCalldata
     ) external payable onlyOwner nonReentrant {
         require(proofHash == passwordHash, "Invalid vault proof");
         require(railgunProxy != address(0), "Invalid Railgun proxy");
         require(amount > 0, "Amount must be greater than zero");
 
         address qTokenAddress = qTokens[tokenAddress];
-        require(qTokenAddress != address(0), "Token not shielded");
-        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient shielded balance");
+        require(qTokenAddress != address(0), "Token not qrypted");
+        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient qrypted balance");
 
-        // Burn qTokens first (CEI: effects before interactions)
         ShieldToken(qTokenAddress).burn(owner, amount);
 
-        // Approve Railgun proxy for exactly this amount
         IERC20(tokenAddress).approve(railgunProxy, amount);
 
-        // Call Railgun shield atomically — forward any ETH required
-        (bool ok,) = railgunProxy.call{value: msg.value}(shieldCalldata);
+        (bool ok,) = railgunProxy.call{value: msg.value}(railgunCalldata);
         require(ok, "Railgun shield failed");
 
-        // Reset any remaining approval to zero
         IERC20(tokenAddress).approve(railgunProxy, 0);
 
         lastActivityBlock = block.number;
-        emit TokenUnshielded(tokenAddress, amount);
+        emit TokenUnqrypted(tokenAddress, amount);
     }
 
     // ── View functions ────────────────────────────────────────────────────
@@ -318,7 +341,7 @@ contract PersonalQryptSafe is ReentrancyGuard {
         return qTokens[tokenAddress];
     }
 
-    function getShieldedBalance(address tokenAddress) external view returns (uint256) {
+    function getQryptedBalance(address tokenAddress) external view returns (uint256) {
         address qTokenAddress = qTokens[tokenAddress];
         if (qTokenAddress == address(0)) return 0;
         return ShieldToken(qTokenAddress).balanceOf(owner);
