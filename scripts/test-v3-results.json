@@ -1,0 +1,52 @@
+{
+  "ts": "2026-04-12T10:26:34.203Z",
+  "proofInitial": "qwe123",
+  "proofNew": "abc456",
+  "tests": [
+    {
+      "n": 1,
+      "title": "createVault",
+      "pass": true,
+      "desc": "Vault deployed at 0xA4f55574a666919cab62b23A11923f999dB1384a. hasVault(walletA)=true.",
+      "txHash": "0x5cc7d8146da42da281b72bc1594cec9b3590f8a0138d84c815930fb2be397b3b",
+      "note": ""
+    },
+    {
+      "n": 2,
+      "title": "approve + shield 2.0 USDC",
+      "pass": true,
+      "desc": "Approved vault to spend 2000000 USDC units. Shielded 2000000 units. Balance=2000000.",
+      "txHash": "0x1cda6e42db64a0dc688b0f93e2350d8a723aad698e795a3e0b159bcaea84da62",
+      "note": "approveTX: 0xaeb781979593cadc0258dacc285d8dfebd6aa2726462158c5a6edc32ee834290"
+    },
+    {
+      "n": 3,
+      "title": "commit + reveal transfer 1.0 USDC",
+      "pass": true,
+      "desc": "commitHash=0x3e9bafccc4... RevealTX burned 1M qUSDC, sent 1.0 USDC to Wallet B. Balance after=1000000.",
+      "txHash": "0xc67d0b17eeb424fce5764a0985e969e3d49fd146c749f498b7e74f3fdb97bc1f",
+      "note": "commitTX: 0xddef61810ae94dea532f99b034ab8503e77509b399e733b08e2ebb6776e53972"
+    },
+    {
+      "n": 4,
+      "title": "changeVaultProof",
+      "pass": true,
+      "desc": "passwordHash updated to keccak256(\"abc456\"). Old proof correctly rejected. New proof accepted.",
+      "txHash": "0xe34cd69ac5f94bc1afd5eb80927d809a8976248b1345703cb7e56ad9324c4c2c",
+      "note": ""
+    },
+    {
+      "n": 5,
+      "title": "unshield with new vault proof",
+      "pass": true,
+      "desc": "Unshielded 1000000 units using proof \"abc456\". Old proof rejected beforehand. Balance after=0.",
+      "txHash": "0xb71cb6f1e44b7557145403597c7dc26e22024719551ff1c81c9dd354f8396055",
+      "note": ""
+    }
+  ],
+  "vaultA": "0xA4f55574a666919cab62b23A11923f999dB1384a",
+  "passed": 5,
+  "failed": 0,
+  "walletA": "0x2459A9B3D481Bb02e6844Cf28314b2c3eaC431e4",
+  "walletB": "0xA3F12571e24811CB885cae2a17F8e45C84343829"
+}
