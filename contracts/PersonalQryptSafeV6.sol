@@ -1,5 +1,30 @@
 // SPDX-License-Identifier: MIT
-// Qryptum Protocol v6.0 -- https://qryptum.org
+/*
+ *
+ *         ███████████████████████████████████████
+ *         ███                                 ███
+ *         ███                                 ███
+ * ███████████████████████████████████████████████████████
+ * ███████████████████████████████████████████████████████
+ * ███                                                 ███
+ * ███     ███  ████  █   █ ████  █████ █   █ █   █    ███
+ * ███    █   █ █   █ █   █ █   █   █   █   █ ██ ██    ███
+ * ███    █   █ ████   █ █  ████    █   █   █ █ █ █    ███
+ * ███    █  ██ █ █     █   █       █   █   █ █   █    ███
+ * ███     ██ █ █  █    █   █       █    ███  █   █    ███
+ * ███                                                 ███
+ * ███                      ████                       ███
+ * ███                     ██  ██                      ███
+ * ███                     ██  ██                      ███
+ * ███                      ████                       ███
+ * ███                       ██                        ███
+ * ███                       ██                        ███
+ * ███                                                 ███
+ * ███████████████████████████████████████████████████████
+ * ███████████████████████████████████████████████████████
+ *
+ */
+// https://qryptum.org
 pragma solidity 0.8.34;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -12,6 +37,8 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
     using SafeERC20 for IERC20;
     using ECDSA for bytes32;
 
+    bytes32 private constant _QRYPTUM_SALT = keccak256("qryptum.v6.sepolia");
+
     address public owner;
     bytes32 private proofChainHead;
     bool public initialized;
@@ -22,11 +49,11 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
     uint256 public constant MINIMUM_SHIELD_AMOUNT = 1e6;
 
     mapping(address => address) public qTokens;
-    mapping(bytes32 => CommitData) private commits;
+    mapping(bytes32 => InitData) private inits;
     mapping(bytes32 => bool) public usedVoucherNonces;
-    mapping(address => uint256) private airBudget;
+    mapping(address => uint256) private airBags;
 
-    struct CommitData {
+    struct InitData {
         uint256 blockNumber;
         uint256 timestamp;
         bool used;
@@ -41,16 +68,16 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         "Voucher(address token,uint256 amount,address recipient,uint256 deadline,bytes32 nonce,bytes32 transferCodeHash)"
     );
 
-    event TokenShielded(address indexed token, uint256 amount, address indexed qToken);
-    event TokenUnshielded(address indexed token, uint256 amount);
-    event TransferExecuted(address indexed token, address indexed to, uint256 amount);
-    event QTokenDeployed(address indexed token, address indexed qToken);
+    event TokenQrypted(address indexed token, uint256 amount, address indexed qToken);
+    event TokenUnqrypted(address indexed token, uint256 amount);
+    event TransferFinalized(address indexed token, address indexed to, uint256 amount);
+    event QTokenCreated(address indexed token, address indexed qToken);
     event ChainRecharged(bytes32 newHead);
-    event CommitSubmitted(bytes32 indexed commitHash);
-    event EmergencyWithdraw(address indexed token, uint256 amount);
-    event AirBudgetFunded(address indexed token, uint256 amount);
-    event AirBudgetReclaimed(address indexed token, uint256 amount);
-    event AirVoucherRedeemed(
+    event TransferInitiated(bytes32 indexed initHash);
+    event EmergencyExit(address indexed token, uint256 amount);
+    event AirBagsFunded(address indexed token, uint256 amount);
+    event AirBagsReclaimed(address indexed token, uint256 amount);
+    event AirVoucherClaimed(
         bytes32 indexed nonce,
         address indexed token,
         uint256 amount,
@@ -110,12 +137,12 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         ShieldToken qToken = new ShieldToken(name, symbol, address(this), underlyingDecimals);
         qTokens[tokenAddress] = address(qToken);
 
-        emit QTokenDeployed(tokenAddress, address(qToken));
+        emit QTokenCreated(tokenAddress, address(qToken));
         return address(qToken);
     }
 
     // ── QryptSafe: deposit tokens into vault ─────────────────────────────
-    function shield(
+    function Qrypt(
         address tokenAddress,
         uint256 amount,
         bytes32 proof
@@ -131,11 +158,11 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         ShieldToken(qTokenAddress).mint(owner, received);
 
         lastActivityBlock = block.number;
-        emit TokenShielded(tokenAddress, received, qTokenAddress);
+        emit TokenQrypted(tokenAddress, received, qTokenAddress);
     }
 
     // ── QryptSafe: withdraw tokens from vault ────────────────────────────
-    function unshield(
+    function unqrypt(
         address tokenAddress,
         uint256 amount,
         bytes32 proof
@@ -144,33 +171,33 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         require(amount > 0, "Amount must be greater than zero");
 
         address qTokenAddress = qTokens[tokenAddress];
-        require(qTokenAddress != address(0), "Token not shielded");
-        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient shielded balance");
+        require(qTokenAddress != address(0), "Token not qrypted");
+        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient qrypted balance");
 
         ShieldToken(qTokenAddress).burn(owner, amount);
         IERC20(tokenAddress).safeTransfer(owner, amount);
 
         lastActivityBlock = block.number;
-        emit TokenUnshielded(tokenAddress, amount);
+        emit TokenUnqrypted(tokenAddress, amount);
     }
 
-    // ── QryptSafe: commit phase of commit-reveal transfer ────────────────
-    function commitTransfer(bytes32 commitHash) external onlyOwner {
-        require(!commits[commitHash].used, "Commit already used");
-        require(commits[commitHash].blockNumber == 0, "Commit already exists");
+    // ── QryptSafe: init phase of initTransfer/finalizeTransfer ───────────
+    function initTransfer(bytes32 initHash) external onlyOwner {
+        require(!inits[initHash].used, "Init already used");
+        require(inits[initHash].blockNumber == 0, "Init already exists");
 
-        commits[commitHash] = CommitData({
+        inits[initHash] = InitData({
             blockNumber: block.number,
             timestamp: block.timestamp,
             used: false
         });
 
         lastActivityBlock = block.number;
-        emit CommitSubmitted(commitHash);
+        emit TransferInitiated(initHash);
     }
 
-    // ── QryptSafe: reveal phase of commit-reveal transfer ────────────────
-    function revealTransfer(
+    // ── QryptSafe: finalize phase of initTransfer/finalizeTransfer ───────
+    function finalizeTransfer(
         address tokenAddress,
         address to,
         uint256 amount,
@@ -182,24 +209,24 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         require(to != address(0), "Invalid recipient");
         require(to != msg.sender, "Cannot transfer to yourself");
 
-        bytes32 commitHash = keccak256(abi.encodePacked(proof, nonce, tokenAddress, to, amount));
-        CommitData storage commit = commits[commitHash];
-        require(commit.blockNumber != 0, "Commit not found");
-        require(!commit.used, "Commit already used");
-        require(block.number > commit.blockNumber, "Must wait one block after commit");
-        require(block.timestamp <= commit.timestamp + COMMIT_EXPIRY_SECONDS, "Commit expired");
+        bytes32 initHash = keccak256(abi.encodePacked(proof, nonce, tokenAddress, to, amount));
+        InitData storage init = inits[initHash];
+        require(init.blockNumber != 0, "Init not found");
+        require(!init.used, "Init already used");
+        require(block.number > init.blockNumber, "Must wait one block after init");
+        require(block.timestamp <= init.timestamp + COMMIT_EXPIRY_SECONDS, "Init expired");
 
-        commit.used = true;
+        init.used = true;
 
         address qTokenAddress = qTokens[tokenAddress];
-        require(qTokenAddress != address(0), "Token not shielded");
-        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient shielded balance");
+        require(qTokenAddress != address(0), "Token not qrypted");
+        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient qrypted balance");
 
         ShieldToken(qTokenAddress).burn(owner, amount);
         IERC20(tokenAddress).safeTransfer(to, amount);
 
         lastActivityBlock = block.number;
-        emit TransferExecuted(tokenAddress, to, amount);
+        emit TransferFinalized(tokenAddress, to, amount);
     }
 
     // ── OTP Chain: recharge when chain exhausted ──────────────────────────
@@ -216,8 +243,8 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         emit ChainRecharged(newHead);
     }
 
-    // ── QryptAir: fund the air budget from shielded balance ───────────────
-    function fundAirBudget(
+    // ── QryptAir: fund the air bags from qrypted balance ──────────────────
+    function fundAirBags(
         address token,
         uint256 amount,
         bytes32 proof
@@ -226,36 +253,36 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         require(amount > 0, "Amount must be greater than zero");
 
         address qTokenAddress = qTokens[token];
-        require(qTokenAddress != address(0), "Token not shielded");
-        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient shielded balance");
+        require(qTokenAddress != address(0), "Token not qrypted");
+        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient qrypted balance");
 
         ShieldToken(qTokenAddress).burn(owner, amount);
-        airBudget[token] += amount;
+        airBags[token] += amount;
 
         lastActivityBlock = block.number;
-        emit AirBudgetFunded(token, amount);
+        emit AirBagsFunded(token, amount);
     }
 
-    // ── QryptAir: reclaim unused air budget back to shielded balance ──────
-    function reclaimAirBudget(
+    // ── QryptAir: reclaim unused air bags back to qrypted balance ─────────
+    function reclaimAirBags(
         address token,
         bytes32 proof
     ) external onlyOwner nonReentrant {
         _consumeProof(proof);
-        uint256 budget = airBudget[token];
-        require(budget > 0, "No air budget to reclaim");
+        uint256 budget = airBags[token];
+        require(budget > 0, "No air bags to reclaim");
 
-        airBudget[token] = 0;
+        airBags[token] = 0;
 
         address qTokenAddress = getOrCreateQToken(token);
         ShieldToken(qTokenAddress).mint(owner, budget);
 
         lastActivityBlock = block.number;
-        emit AirBudgetReclaimed(token, budget);
+        emit AirBagsReclaimed(token, budget);
     }
 
     // ── QryptAir: redeem an offline-signed EIP-712 voucher ───────────────
-    function redeemAirVoucher(
+    function claimAirVoucher(
         address token,
         uint256 amount,
         address recipient,
@@ -269,7 +296,7 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         require(amount    >  0,          "Zero amount");
         require(block.timestamp <= deadline, "Voucher expired");
         require(!usedVoucherNonces[nonce], "Voucher already redeemed");
-        require(airBudget[token] >= amount, "Insufficient air budget");
+        require(airBags[token] >= amount, "Insufficient air bags");
 
         bytes32 domainSeparator = keccak256(abi.encode(
             _QRYPTAIR_DOMAIN_TYPEHASH,
@@ -295,16 +322,16 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         require(signer == owner,      "Sig not from vault owner");
 
         usedVoucherNonces[nonce] = true;
-        airBudget[token] -= amount;
+        airBags[token] -= amount;
         lastActivityBlock = block.number;
 
         IERC20(token).safeTransfer(recipient, amount);
 
-        emit AirVoucherRedeemed(nonce, token, amount, recipient);
+        emit AirVoucherClaimed(nonce, token, amount, recipient);
     }
 
-    // ── QryptShield: atomic unshield-to-Railgun ──────────────────────────
-    function unshieldToRailgun(
+    // ── QryptShield: atomic unqrypt-to-Railgun ────────────────────────────
+    function railgun(
         address tokenAddress,
         uint256 amount,
         bytes32 proof,
@@ -316,8 +343,8 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         require(amount > 0, "Amount must be greater than zero");
 
         address qTokenAddress = qTokens[tokenAddress];
-        require(qTokenAddress != address(0), "Token not shielded");
-        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient shielded balance");
+        require(qTokenAddress != address(0), "Token not qrypted");
+        require(ShieldToken(qTokenAddress).balanceOf(owner) >= amount, "Insufficient qrypted balance");
 
         ShieldToken(qTokenAddress).burn(owner, amount);
 
@@ -329,7 +356,7 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         IERC20(tokenAddress).approve(railgunProxy, 0);
 
         lastActivityBlock = block.number;
-        emit TokenUnshielded(tokenAddress, amount);
+        emit TokenUnqrypted(tokenAddress, amount);
     }
 
     // ── Emergency: withdraw after long inactivity ─────────────────────────
@@ -344,7 +371,7 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
             uint256 balance = IERC20(tokenAddress).balanceOf(address(this));
             if (balance > 0) {
                 IERC20(tokenAddress).safeTransfer(owner, balance);
-                emit EmergencyWithdraw(tokenAddress, balance);
+                emit EmergencyExit(tokenAddress, balance);
             }
         }
     }
@@ -355,14 +382,14 @@ contract PersonalQryptSafeV6 is ReentrancyGuard {
         return qTokens[tokenAddress];
     }
 
-    function getShieldedBalance(address tokenAddress) external view returns (uint256) {
+    function getQryptedBalance(address tokenAddress) external view returns (uint256) {
         address qTokenAddress = qTokens[tokenAddress];
         if (qTokenAddress == address(0)) return 0;
         return ShieldToken(qTokenAddress).balanceOf(owner);
     }
 
-    function getAirBudget(address token) external view returns (uint256) {
-        return airBudget[token];
+    function getAirBags(address token) external view returns (uint256) {
+        return airBags[token];
     }
 
     function getEmergencyWithdrawAvailableBlock() external view returns (uint256) {
