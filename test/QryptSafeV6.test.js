@@ -217,11 +217,11 @@ describe("QryptSafeV6", function () {
                 )
             );
 
-            await vault.connect(owner).veilTransfer(veilHash);
+            await vault.connect(owner).initTransfer(veilHash);
             await ethers.provider.send("evm_mine", []);
 
             const balBefore = await token.balanceOf(recipientAddr);
-            await vault.connect(owner).unveilTransfer(tokenAddr, recipientAddr, SHIELD_AMOUNT, proof, nonce);
+            await vault.connect(owner).finalizeTransfer(tokenAddr, recipientAddr, SHIELD_AMOUNT, proof, nonce);
             const balAfter = await token.balanceOf(recipientAddr);
             expect(balAfter - balBefore).to.equal(SHIELD_AMOUNT);
         });
@@ -239,11 +239,11 @@ describe("QryptSafeV6", function () {
                 )
             );
 
-            await vault.connect(owner).veilTransfer(veilHash);
+            await vault.connect(owner).initTransfer(veilHash);
             await ethers.provider.send("evm_mine", []);
 
             await expect(
-                vault.connect(owner).unveilTransfer(tokenAddr, recipient.address, SHIELD_AMOUNT, wrongProof, nonce)
+                vault.connect(owner).finalizeTransfer(tokenAddr, recipient.address, SHIELD_AMOUNT, wrongProof, nonce)
             ).to.be.revertedWith("Invalid vault proof");
         });
     });
