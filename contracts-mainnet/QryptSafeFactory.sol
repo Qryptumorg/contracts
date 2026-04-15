@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: MIT
+/*
+ *
+ *         ███████████████████████████████████████
+ *         ███                                 ███
+ *         ███                                 ███
+ * ███████████████████████████████████████████████████████
+ * ███████████████████████████████████████████████████████
+ * ███                                                 ███
+ * ███     ███  ████  █   █ ████  █████ █   █ █   █    ███
+ * ███    █   █ █   █ █   █ █   █   █   █   █ ██ ██    ███
+ * ███    █   █ ████   █ █  ████    █   █   █ █ █ █    ███
+ * ███    █  ██ █ █     █   █       █   █   █ █   █    ███
+ * ███     ██ █ █  █    █   █       █    ███  █   █    ███
+ * ███                                                 ███
+ * ███                      ████                       ███
+ * ███                     ██  ██                      ███
+ * ███                     ██  ██                      ███
+ * ███                      ████                       ███
+ * ███                       ██                        ███
+ * ███                       ██                        ███
+ * ███                                                 ███
+ * ███████████████████████████████████████████████████████
+ * ███████████████████████████████████████████████████████
+ *
+ */
+// https://qryptum.org
+pragma solidity 0.8.34;
+
+import "@openzeppelin/contracts/proxy/Clones.sol";
+import "./QryptSafe.sol";
+
+contract QryptSafeFactory {
+    using Clones for address;
+
+    address public immutable qryptSafeImpl;
+    mapping(address => address) private vaults;
+
+    event QryptSafeCreated(address indexed owner, address indexed vault);
+
+    constructor() {
+        qryptSafeImpl = address(new QryptSafe());
+    }
+
+    function createQryptSafe(bytes32 initialChainHead) external returns (address vault) {
+        require(vaults[msg.sender] == address(0), "QryptSafe already exists for this wallet");
+        require(initialChainHead   != bytes32(0), "Invalid chain head");
+
+        vault = qryptSafeImpl.clone();
+        QryptSafe(vault).initialize(msg.sender, initialChainHead);
+        vaults[msg.sender] = vault;
+
+        emit QryptSafeCreated(msg.sender, vault);
+    }
+
+    function hasQryptSafe(address wallet) external view returns (bool) {
+        return vaults[wallet] != address(0);
+    }
+
+    function getQryptSafe(address wallet) external view returns (address) {
+        return vaults[wallet];
+    }
+}
